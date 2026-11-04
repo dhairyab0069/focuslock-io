@@ -175,7 +175,7 @@
       new MutationObserver(syncClass).observe(html, { attributes: true, attributeFilter: ['data-calm'] });
       if (mq.addEventListener) mq.addEventListener('change', syncClass);
       document.addEventListener('visibilitychange', function () { html.classList.toggle('tab-hidden', document.hidden); syncClass(); });
-      if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { color = getComputedStyle(html).getPropertyValue('--sage').trim() || color; });
+      window.addEventListener('themechange', function () { color = getComputedStyle(html).getPropertyValue('--sage').trim() || color; });
       syncClass();
     },
     /* Other loops (the living background) join this one rather than starting their own. */

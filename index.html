@@ -20,6 +20,15 @@
 <meta name="twitter:title" content="FocusLock: a calm focus timer for macOS">
 <meta name="twitter:description" content="A timer plus a distraction blocker, nothing else. Try the simulator.">
 <meta name="twitter:image" content="https://dhairyab0069.github.io/focuslock-io/assets/og-image.png">
+<script>
+/* Shared theme (one setting for all of dhairyab0069.github.io): localStorage "theme" = light | dark | auto. Applied before the stylesheet paints, so nothing flashes. */
+(function () {
+  var m; try { m = localStorage.getItem('theme'); } catch (e) {}
+  if (m !== 'light' && m !== 'dark') m = 'auto';
+  var t = m === 'auto' ? (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : m, r = document.documentElement;
+  r.setAttribute('data-theme-mode', m); r.setAttribute('data-theme', t); r.style.colorScheme = t;
+})();
+</script>
 <link rel="stylesheet" href="assets/style.css">
 <script>
 /* Apply saved quiet settings before first paint. Motion is on unless the system asks for reduced motion or you chose otherwise. */
@@ -49,6 +58,11 @@
       <a href="#source">Source</a>
     </nav>
     <div class="switches icons" role="group" aria-label="Sound, motion and cursor effects">
+      <div class="theme-switch" id="theme-switch" role="radiogroup" aria-label="Color theme">
+        <button type="button" role="radio" aria-checked="false" data-theme-mode="light" aria-label="Light theme" title="Light theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+        <button type="button" role="radio" aria-checked="false" data-theme-mode="dark" aria-label="Dark theme" title="Dark theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg></button>
+        <button type="button" role="radio" aria-checked="false" data-theme-mode="auto" aria-label="Match system theme" title="Auto (match system)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></button>
+      </div>
       <button class="ico" type="button" id="b-sound" aria-pressed="true" aria-label="Sound on" title="Sound on. Press to turn off.">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><g class="on-only"><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a8 8 0 0 1 0 11"/></g><path class="off-only" d="M16 9.5l5 5M21 9.5l-5 5"/></svg>
       </button>
@@ -282,6 +296,7 @@
 <div class="toasts" id="toasts"></div>
 <div class="sr" id="announce" role="status" aria-live="polite"></div>
 <script src="assets/ui.js"></script>
+<script src="assets/theme.js"></script>
 <script src="assets/core.js"></script>
 <script src="assets/rules.js"></script>
 <script src="assets/scenario.js"></script>

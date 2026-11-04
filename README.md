@@ -10,6 +10,10 @@ this page (`assets/core.js`) that follows the app's rules and lists.
 
 Live at https://dhairyab0069.github.io/focuslock-io/ (GitHub Pages, served from the repo root).
 
+## Light, dark and auto
+
+The three-icon switch in the top bar picks Light, Dark or Auto (follow the system). The choice is saved as `theme` in `localStorage`, which every site on dhairyab0069.github.io shares, so it carries across the sites and updates live in other open tabs. A small script in the page head applies it before the first paint (no flash). The canvases, motes, lantern, haze and sand garden re-read their colours when it changes, with a short circle reveal and a soft chime (instant when motion is off), and both palettes keep text at 4.5:1 contrast or better. See `assets/theme.js`.
+
 ## Run locally
 
 Static HTML, CSS and plain JavaScript; no build step, no libraries, no external requests (no web fonts, CDNs

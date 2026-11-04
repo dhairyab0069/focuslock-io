@@ -399,4 +399,10 @@ ok('page hygiene: no external requests, no secrets, no source paths', () => {
     assert.ok(!/fetch\(|XMLHttpRequest|WebSocket|sendBeacon/.test(t), f + ' makes requests');
   }
 });
+ok('shared theme: key, early head script and radiogroup are wired', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8'), head = html.split('</head>')[0];
+  assert.ok(head.indexOf("getItem('theme')") > -1 && head.indexOf("getItem('theme')") < head.indexOf('assets/style.css'), 'early theme script must precede the stylesheet');
+  assert.ok(/role="radiogroup" aria-label="Color theme"/.test(html) && /assets\/theme\.js/.test(html));
+  assert.ok(/'themechange'/.test(fs.readFileSync(path.join(__dirname, '..', 'assets/nature.js'), 'utf8')));
+});
 console.log(`\n${n} passed`);

@@ -28,6 +28,7 @@
   }
   var SOUNDS = {
     water:  function () { sweep(900, 420, 0.22, 0.03); tone(1300, 0.03, 0.08, 0.012); },
+    theme:  function () { tone(659.25, 0, 0.9, 0.018); tone(880, 0.12, 1.1, 0.014); },
     chime:  function () { tone(784, 0, 1.1, 0.025); tone(988, 0.18, 1.1, 0.02); tone(1175, 0.36, 1.3, 0.018); },
     rake:   function () { tone(170 + Math.random() * 40, 0, 0.06, 0.012, 'triangle'); },
     breathin:  function () { sweep(220, 330, 1.2, 0.02); },

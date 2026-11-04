@@ -1,18 +1,27 @@
-:root {
+:root, :root[data-theme="light"] {
+  color-scheme: light;
   --bg: #eef2ec; --surface: #f9faf6; --surface2: #e6ebe2; --ink: #22323a; --muted: #52646b; --line: #d3dccf;
-  --sage: #3d7a64; --sage-soft: #d7e8df; --amber: #84642b; --amber-soft: #f1e6cf; --rose: #94595a; --rose-soft: #efdcd8;
-  --teal: #2e6a70; --lav: #7b72b0; --lav-soft: #e6e3f2; --sand: #ecdfc6; --lantern-rgb: 255,214,130; --haze: rgba(238,242,236,.2);
+  --sage: #33705a; --sage-soft: #d7e8df; --amber: #7a5c24; --amber-soft: #f1e6cf; --rose: #874f50; --rose-soft: #efdcd8;
+  --teal: #2e6a70; --lav: #5f56a0; --lav-soft: #e6e3f2; --sand: #ecdfc6; --lantern-rgb: 206,140,40; --haze: rgba(238,242,236,.2);
   --focus: #2a5fb0; --ring-track: #d9e1d5;
   --font: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --r: 22px;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+:root[data-theme="dark"] {
     --bg: #101a1e; --surface: #182529; --surface2: #1f2f34; --ink: #e4eae4; --muted: #a7b7b6; --line: #2f4348;
     --sage: #93cdb4; --sage-soft: #234239; --amber: #e0c07f; --amber-soft: #3d3522; --rose: #e0a8a2; --rose-soft: #422e2e;
     --teal: #6fb7bd; --lav: #b9b2e6; --lav-soft: #2a2845; --sand: #3a3426; --lantern-rgb: 255,214,130; --haze: rgba(8,22,26,.24);
     --focus: #8fb8ff; --ring-track: #2c3f44;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg: #101a1e; --surface: #182529; --surface2: #1f2f34; --ink: #e4eae4; --muted: #a7b7b6; --line: #2f4348;
+    --sage: #93cdb4; --sage-soft: #234239; --amber: #e0c07f; --amber-soft: #3d3522; --rose: #e0a8a2; --rose-soft: #422e2e;
+    --teal: #6fb7bd; --lav: #b9b2e6; --lav-soft: #2a2845; --sand: #3a3426; --lantern-rgb: 255,214,130; --haze: rgba(8,22,26,.24);
+    --focus: #8fb8ff; --ring-track: #2c3f44;
+    color-scheme: dark;
   }
 }
 * { box-sizing: border-box; }
@@ -57,7 +66,8 @@ section { padding: 4.5rem 0 1rem; }
 .btn:hover { background: var(--surface2); }
 .btn.primary { background: var(--sage); border-color: var(--sage); color: #fff; }
 .btn.primary:hover { filter: brightness(1.06); background: var(--sage); }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #10201a; } }
+:root[data-theme="dark"] .btn.primary { color: #10201a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme]) .btn.primary { color: #10201a; } }
 .btn.warn { border-color: var(--rose); color: var(--rose); }
 .btn.small { min-height: 38px; padding: .35rem .8rem; font-size: 1rem; }
 .btn[disabled] { opacity: .55; cursor: not-allowed; }
@@ -513,3 +523,14 @@ html.fx .pausering { animation: pausebreathe 10s ease-in-out infinite; } @keyfra
 #quiet-all[aria-pressed="true"] { color: var(--ink, currentColor); }
 #quiet-all .off-only, #quiet-all .on-only { display: inline; }
 @media (max-width: 640px) { .ico { width: 40px; height: 40px; } .switches.icons { gap: .25rem; } }
+
+/* ---------- shared light / dark / auto switch (one setting for all of dhairyab0069.github.io) ---------- */
+.theme-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 24px; overflow: hidden; flex: none; }
+.theme-switch button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); cursor: pointer; transition: background-color .2s, color .2s; }
+.theme-switch button + button { border-left: 1px solid var(--line); }
+.theme-switch svg { width: 22px; height: 22px; }
+.theme-switch button:hover { color: var(--ink); }
+.theme-switch button[aria-checked="true"] { color: var(--ink); background: color-mix(in srgb, var(--sage) 26%, transparent); box-shadow: inset 0 0 12px color-mix(in srgb, var(--sage) 35%, transparent); }
+.theme-switch button:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+html.theme-fade *, html.theme-fade *::before, html.theme-fade *::after { transition: background-color .4s, color .4s, border-color .4s, box-shadow .4s !important; }

@@ -250,7 +250,7 @@
 
   /* ---------- start ---------- */
   applyCalm(); readColors(); resize(); sandSize();
-  if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { readColors(); sandBase(); smoothNow(); if (!FX.on()) drawStatic(); });
+  window.addEventListener('themechange', function () { readColors(); sandBase(); smoothNow(); if (!FX.on()) drawStatic(); });
   document.addEventListener('visibilitychange', function () { if (!document.hidden) readColors(); });
   var mo = new MutationObserver(function () { if (!FX.on()) { drawStatic(); textTick(); } }); mo.observe(html, { attributes: true, attributeFilter: ['data-calm'] });
   G.nature = { ptr: ptr, motes: motes, ripples: ripples, blooms: blooms, setCalm: function (v) { calmSw.checked = v; calmSw.dispatchEvent(new Event('change')); } };
