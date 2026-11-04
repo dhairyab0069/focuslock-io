@@ -4,7 +4,7 @@ The project page for FocusLock, a minimal macOS focus timer: an LLM watchdog pau
 filtered for social media, and emergency killswitches mean it never traps you. The page has an interactive
 session simulator, a filter probe, and the emergency exits explained and demoable.
 
-**The FocusLock source is private for now.** This page only describes behaviour; it contains no app code,
+**The FocusLock source is private.** This page only describes behaviour; it contains no app code,
 prompts or settings, and does not link the private repository. The simulator is a separate model written for
 this page (`assets/core.js`) that follows the app's rules and lists.
 
