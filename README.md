@@ -96,3 +96,7 @@ requests and contains no secrets or local paths.
 - `assets/sound.js` optional synthesized sound
 - `assets/style.css` calm, low-stimulation styling with a dark scheme
 - `assets/og-image.png`, `assets/favicon-64.png`
+
+## Design
+
+[DESIGN.md](DESIGN.md) documents the design (purpose, theme, tokens, motion, sound, controls, accessibility, decisions, how to extend).
