@@ -182,3 +182,73 @@ footer p { max-width: none; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- motion layer ----------
+   Every rule here sits behind html.fx (JS says motion is allowed) or is a plain hover/press nicety that the
+   global calm rule and prefers-reduced-motion switch off. Only transform, opacity and clip-path animate. */
+.scrollbar { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--sage); transform: scaleX(0); transform-origin: 0 50%; opacity: .75; }
+.btn, .chip, .card, .panel, .seg span, .sw { transition: transform .18s cubic-bezier(.2,.7,.2,1), background-color .2s, border-color .2s, box-shadow .2s, opacity .2s; }
+.btn:hover, .chip:hover { transform: translateY(-1px); }
+.btn:active, .chip:active, .seg label:active span { transform: translateY(0) scale(.97); }
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.07); }
+.sw:active { transform: scale(.97); }
+.seg label:hover span { border-color: var(--sage); }
+
+html.fx .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s ease var(--d, 0s), transform .6s cubic-bezier(.2,.7,.2,1) var(--d, 0s); }
+html.fx .reveal.in { opacity: 1; transform: none; }
+html.fx .reveal.in.card:hover { transform: translateY(-2px); transition-delay: 0s; transition-duration: .18s; }
+
+#fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 4; }
+.win { position: relative; z-index: 2; }
+
+/* countdown dial: ring and glow are driven by fx.js; CSS only adds the one-shot settle and rise */
+.dial .glow { position: absolute; inset: -14px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--sage) 38%, transparent) 40%, transparent 70%); opacity: .0; pointer-events: none; }
+.dial.paused .glow { background: radial-gradient(circle, color-mix(in srgb, var(--rose) 30%, transparent) 40%, transparent 70%); }
+.dial svg { position: relative; }
+.dial .prog { transition: stroke .5s; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--sage) 55%, transparent)); }
+.dial.paused .prog { filter: none; }
+.dial .t { transition: color .4s; }
+.dial.paused .t { color: var(--rose); }
+.dial.settle { animation: settle .7s cubic-bezier(.3,1.4,.5,1); }
+.dial.rise-back { animation: riseback .9s cubic-bezier(.2,.7,.2,1); }
+@keyframes settle { 0% { transform: scale(1); } 30% { transform: scale(.955); } 100% { transform: scale(1); } }
+@keyframes riseback { 0% { transform: scale(.97); } 100% { transform: scale(1); } }
+.meta.bump { animation: bump .5s cubic-bezier(.3,1.4,.5,1); }
+@keyframes bump { 0% { transform: scale(1.08); } 100% { transform: scale(1); } }
+
+/* watchdog sweep over the pretend process list */
+.checks { position: relative; }
+.approw { padding: 0 .5rem; margin: 0 -.5rem; border-radius: 10px; transition: background-color .7s ease; }
+.approw.lit { background: var(--sage-soft); transition-duration: .12s; }
+.approw.hit, .approw.hit.lit { background: var(--rose-soft); }
+.sweep { position: absolute; left: -.5rem; right: -.5rem; top: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--sage), transparent); opacity: 0; pointer-events: none; will-change: transform; }
+/* the browser poll: a slow soft bar crossing the address bar every 2 seconds while a session runs on screen */
+.tabbar { position: relative; overflow: hidden; }
+html.fx .live .tabbar::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--sage) 22%, transparent), transparent); animation: poll 2s linear infinite; pointer-events: none; }
+@keyframes poll { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+.page-view.slide { animation: slidein .45s cubic-bezier(.2,.7,.2,1); }
+@keyframes slidein { from { transform: translateX(22px); opacity: .35; } to { transform: none; opacity: 1; } }
+
+/* overlay: an iris that closes over the pretend Mac, and lifts away again */
+.overlay { animation: iris .6s cubic-bezier(.2,.7,.2,1); }
+.overlay > div { animation: contentin .5s ease .18s both; }
+.overlay.out { animation: irisout .5s cubic-bezier(.5,0,.8,.4) forwards; pointer-events: none; }
+@keyframes iris { from { clip-path: circle(0% at 50% 50%); } to { clip-path: circle(150% at 50% 50%); } }
+@keyframes irisout { from { clip-path: circle(150% at 50% 50%); } to { clip-path: circle(0% at 50% 50%); } }
+@keyframes contentin { from { transform: translateY(10px); opacity: .0; } to { transform: none; opacity: 1; } }
+.stage.shake { animation: shake .8s ease-in-out; }
+@keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 55% { transform: translateX(2px); } 80% { transform: translateX(-1px); } }
+
+/* SOS pulse and ripple */
+.sos { position: relative; }
+.sos::after { content: ""; position: absolute; inset: -2px; border-radius: 12px; border: 2px solid var(--rose); opacity: 0; animation: sospulse 2.4s ease-out infinite; pointer-events: none; }
+@keyframes sospulse { 0% { transform: scale(1); opacity: .55; } 70%, 100% { transform: scale(1.18, 1.5); opacity: 0; } }
+.ripple { position: absolute; z-index: 5; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 3px solid var(--rose); pointer-events: none; animation: ripple .8s ease-out forwards; }
+@keyframes ripple { from { transform: scale(.4); opacity: .7; } to { transform: scale(14); opacity: 0; } }
+
+/* probe verdict stamp */
+.verdict.stamp { animation: stamp .5s cubic-bezier(.3,1.5,.5,1); }
+@keyframes stamp { 0% { transform: scale(1.12) rotate(-1.5deg); opacity: .4; } 60% { transform: scale(.985) rotate(.2deg); opacity: 1; } 100% { transform: none; } }
+
+/* looping decoration rests when off screen or the tab is hidden */
+.off, .off *, html.tab-hidden * { animation-play-state: paused !important; }

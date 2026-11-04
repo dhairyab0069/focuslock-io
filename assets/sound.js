@@ -20,7 +20,19 @@
     o.connect(g); g.connect(c.destination);
     o.start(t); o.stop(t + dur + 0.05);
   }
+  function sweep(f1, f2, dur, vol) {
+    var c = ctx, t = c.currentTime, o = c.createOscillator(), g = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.4); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
+  }
   var SOUNDS = {
+    scan:   function () { tone(880, 0, 0.09, 0.015); },
+    type:   function () { tone(1250, 0, 0.04, 0.012); },
+    stamp:  function () { tone(190, 0, 0.18, 0.06, 'triangle'); tone(380, 0.02, 0.1, 0.025); },
+    whoosh: function () { sweep(700, 180, 0.5, 0.035); },
+    lift:   function () { sweep(180, 700, 0.5, 0.03); },
+    ripple: function () { sweep(260, 520, 0.6, 0.03); },
     click:  function () { tone(520, 0, 0.12, 0.05); },
     start:  function () { tone(392, 0, 0.5, 0.06); tone(523.25, 0.14, 0.6, 0.05); },
     pause:  function () { tone(330, 0, 0.5, 0.06); tone(262, 0.16, 0.7, 0.05); },
