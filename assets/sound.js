@@ -27,6 +27,12 @@
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
   }
   var SOUNDS = {
+    water:  function () { sweep(900, 420, 0.22, 0.03); tone(1300, 0.03, 0.08, 0.012); },
+    chime:  function () { tone(784, 0, 1.1, 0.025); tone(988, 0.18, 1.1, 0.02); tone(1175, 0.36, 1.3, 0.018); },
+    rake:   function () { tone(170 + Math.random() * 40, 0, 0.06, 0.012, 'triangle'); },
+    breathin:  function () { sweep(220, 330, 1.2, 0.02); },
+    breathout: function () { sweep(330, 200, 1.4, 0.02); },
+    current: function () { sweep(140, 200, 0.9, 0.02); },
     open:   function () { tone(480, 0, 0.1, 0.03); tone(640, 0.06, 0.12, 0.025); },
     close:  function () { tone(420, 0, 0.1, 0.025); },
     snap:   function () { tone(300, 0, 0.07, 0.04, 'triangle'); },

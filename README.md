@@ -33,6 +33,21 @@ The page is built around a pretend Mac you can use from the first second. It is 
 
 Page extras (not in the real app) are labelled on the page: scenarios and presets, the rules lab and custom grace or length, stats and history, the menu bar status item and the browser picker.
 
+## Healing and mindfulness theme, and cursor effects
+
+The page is re-skinned in mist, sage, warm sand, deep-water teal and a touch of lavender, with rounded shapes, leaf and lotus motifs and spacious system-font type. Light and dark are both calm. A living layer reacts to the pointer (a finger counts on touch), all in `assets/nature.js` with the physics in `assets/field.js` (pure, tested):
+
+- *Background field:* fireflies, pollen and petals drift behind the page, part around the pointer and drift back; a soft lantern follows the pointer. Fewer motes on phones.
+- *Ripples and current:* a click or tap makes a still-water ripple; press and hold makes a slow current that swirls the motes around you.
+- *Haze:* a faint mist covers the page and clears under the pointer. Switchable.
+- *Growth:* lotus, fern and moss bloom where the pointer rests, then fade (capped at 12).
+- *Lean and glow:* cards, panels and pretend windows lean toward the pointer with a specular glow; headings and the hero ring shift a little with depth.
+- *Sand garden:* drag to rake lines (three tines), drag or arrow-key the stones (rings form around them), smooth the sand, or have a wave raked for you. It works by drag even with motion stopped. Soft rake and water-drop sounds if Sound is on.
+- *Breathing guide:* a ring in the corner (or following the pointer). Hold it, or hold Space or Enter on it, to breathe at a calm pace (in 4 out 6, in 4 out 4, or box). It can pace the simulator's glow, can be hidden, and becomes words only when motion is off.
+- *Mindful moments:* an optional 20 second pause and a five-things grounding exercise. Page extras, not medical advice.
+
+**Calm mode** (top bar) fades every cursor effect at once. **Stop all motion**, **Quiet everything** and `prefers-reduced-motion` also stop the background loop (it becomes a still picture), the lantern, haze, lean and parallax. Everything joins the page's single animation loop in `assets/fx.js`, uses only canvas, transform and opacity, pauses when the tab is hidden, and is `aria-hidden` decoration.
+
 ## Quiet by design
 
 - The top bar has **Stop all motion** (starts on if your system asks for reduced motion) and **Sound**
@@ -72,6 +87,7 @@ requests and contains no secrets or local paths.
 - `assets/app.js` simulator and probe UI
 - `assets/rules.js` editable rules, program scan, undo; `assets/scenario.js` presets, scenarios, scheduler; `assets/score.js` history and gentle summaries; `assets/hash.js` URL-hash state; `assets/challenge.js` break-it attempts; `assets/wm.js` window geometry; `assets/keys.js` shortcuts (all pure and tested)
 - `assets/state.js`, `desktop.js`, `panels.js`, `app.js`, `ui.js` page glue and UI
+- `assets/field.js` motes, ripples, blooms, breath pacing, rake geometry (pure, tested); `assets/nature.js` the calm cursor layer, sand garden, breathing guide and mindful moments
 - `assets/fx.js` motion: easing, particles, the single animation loop (pure parts tested)
 - `assets/sound.js` optional synthesized sound
 - `assets/style.css` calm, low-stimulation styling with a dark scheme

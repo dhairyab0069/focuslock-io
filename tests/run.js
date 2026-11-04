@@ -10,6 +10,7 @@ const SCORE = require('../assets/score.js');
 const HASH = require('../assets/hash.js');
 const CH = require('../assets/challenge.js');
 const WM = require('../assets/wm.js');
+const FLD = require('../assets/field.js');
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log('ok', n, name); };
@@ -362,9 +363,31 @@ ok('wm: flick velocity is capped and inertia decays to rest inside the desktop',
   assert.equal(st.done, true);
 });
 ok('wm: phones show one app at a time', () => { assert.equal(WM.isPhone(390), true); assert.equal(WM.isPhone(1200), false); assert.deepEqual(WM.phoneRect({ w: 390, h: 600 }), { x: 0, y: 0, w: 390, h: 600 }); });
+ok('field: motes part around the pointer, swirl while it is held, and the count stays capped', () => {
+  const m = FLD.createMotes({ cap: 60, seed: 2 }); m.fill(800, 600, 9999); assert.equal(m.list.length, 60);
+  const near = m.list[0]; near.x = 410; near.y = 300; near.vx = near.vy = 0; const d0 = Math.hypot(near.x - 400, near.y - 300);
+  for (let i = 0; i < 20; i++) m.step(1 / 60, 800, 600, { x: 400, y: 300, on: true, down: false, held: 0 }); assert.ok(Math.hypot(near.x - 400, near.y - 300) > d0, 'pushed away');
+  const s = FLD.createMotes({ cap: 1, seed: 2 }); s.fill(800, 600, 1); const q = s.list[0]; q.x = 460; q.y = 300; q.vx = q.vy = 0;
+  for (let i = 0; i < 30; i++) s.step(1 / 60, 800, 600, { x: 400, y: 300, on: true, down: true, held: 1.5 }); assert.ok(Math.abs(q.y - 300) > 1, 'swirled sideways');
+  assert.ok(FLD.moteCount(390) < FLD.moteCount(1400));
+});
+ok('field: blooms only grow where the pointer rests, are capped, and fade away; ripples end', () => {
+  const b = FLD.createBlooms({ cap: 12, seed: 1 }); const still = { x: 100, y: 100, on: true };
+  for (let i = 0; i < 60 * 40; i++) { b.update(1 / 60, still); assert.ok(b.list.length <= 12); } assert.ok(b.list.length > 0);
+  const moving = FLD.createBlooms({ seed: 1 }); for (let i = 0; i < 600; i++) moving.update(1 / 60, { x: i * 9, y: 50, on: true }); assert.equal(moving.list.length, 0);
+  for (let i = 0; i < 60 * 20; i++) b.update(1 / 60, { on: false }); assert.equal(b.list.length, 0);
+  const r = FLD.createRipples(3); for (let i = 0; i < 5; i++) r.add(i, i); assert.equal(r.list.length, 3); for (let i = 0; i < 200; i++) r.step(0.02); assert.equal(r.list.length, 0);
+});
+ok('field: breathing presets pace in and out calmly, and the rake offsets its tines', () => {
+  assert.equal(FLD.breathAt(0, '4-6').phase, 'in'); assert.ok(FLD.breathAt(3.99, '4-6').scale > 0.99 && FLD.breathAt(10, '4-6').scale < 0.01);
+  assert.equal(FLD.breathAt(5, '4-6').phase, 'out'); assert.equal(FLD.breathAt(5, '4-6').label, 'Breathe out'); assert.equal(FLD.breathCycle('box'), 16); assert.equal(FLD.breathAt(6, 'box').label, 'Hold');
+  assert.ok(FLD.breathCycle('4-4') >= 8, 'never faster than a calm pace');
+  const o = FLD.offsetPolyline([{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 20, y: 0 }], 9); assert.ok(o.every((p) => Math.abs(Math.abs(p.y) - 9) < 1e-9));
+  assert.equal(FLD.thin([{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 8, y: 0 }], 4).length, 2);
+});
 ok('page hygiene: no external requests, no secrets, no source paths', () => {
   const root = path.join(__dirname, '..');
-  const files = ['index.html', 'assets/app.js', 'assets/core.js', 'assets/sound.js', 'assets/fx.js', 'assets/style.css', 'assets/ui.js', 'assets/rules.js', 'assets/scenario.js', 'assets/score.js', 'assets/hash.js', 'assets/challenge.js', 'assets/wm.js', 'assets/keys.js', 'assets/state.js', 'assets/desktop.js', 'assets/panels.js'];
+  const files = ['index.html', 'assets/app.js', 'assets/core.js', 'assets/sound.js', 'assets/fx.js', 'assets/style.css', 'assets/ui.js', 'assets/rules.js', 'assets/scenario.js', 'assets/score.js', 'assets/hash.js', 'assets/challenge.js', 'assets/wm.js', 'assets/keys.js', 'assets/state.js', 'assets/desktop.js', 'assets/panels.js', 'assets/field.js', 'assets/nature.js'];
   for (const f of files) {
     const t = fs.readFileSync(path.join(root, f), 'utf8');
     if (f === 'index.html') {

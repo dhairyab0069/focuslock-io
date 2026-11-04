@@ -69,7 +69,7 @@
 
   /* ---------------- browser engine ---------------- */
   var html = document.documentElement, mq = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
-  var cfg = null, raf = 0, last = 0, now = 0, onscreen = true, tasks = [];
+  var cfg = null, raf = 0, last = 0, now = 0, onscreen = true, tasks = [], layers = [];
   var P = createParticles({ cap: 48, seed: 7 });
   var disp = 0, targetFrac = 0, amp = 0, sweepT = -1, color = '#4d7a68', ctx2d = null, size = { w: 0, h: 0 }, litIdx = -1;
 
@@ -87,9 +87,10 @@
   }
   function stopAll() {
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    layers.forEach(function (l) { if (l.stop) l.stop(); });
     tasks.length = 0; sweepT = -1; litIdx = -1; P.clear();
     disp = targetFrac; paintDial(disp);
-    if (cfg) {
+    if (cfg && cfg.state) {
       if (ctx2d) ctx2d.clearRect(0, 0, size.w, size.h);
       var d = cfg.dial && cfg.dial();
       if (d && d.glow) { d.glow.style.transform = ''; d.glow.style.opacity = ''; }
@@ -99,7 +100,9 @@
     }
   }
   function wantLoop() {
-    if (!cfg || !allowed() || !onscreen) return false;
+    if (!allowed()) return false;
+    for (var li = 0; li < layers.length; li++) if (layers[li].active()) return true;
+    if (!cfg || !onscreen) return false;
     return cfg.state.phase === 'running' || P.count() > 0 || sweepT >= 0 || tasks.length > 0 || Math.abs(disp - targetFrac) > 0.0005;
   }
   function ensure() { if (!raf && wantLoop()) { last = performance.now(); raf = requestAnimationFrame(frame); } }
@@ -111,12 +114,14 @@
     raf = requestAnimationFrame(frame);
   }
   function update(dt) {
+    for (var lj = 0; lj < layers.length; lj++) if (layers[lj].active()) layers[lj].update(dt, now);
+    if (!cfg || !cfg.state) return;
     var S = cfg.state, d = cfg.dial();
     disp = smooth(disp, targetFrac, dt, 5); if (Math.abs(disp - targetFrac) < 0.0003) disp = targetFrac;
     paintDial(disp);
     if (d.glow) {
       amp = smooth(amp, S.phase === 'running' && !cfg.paused() ? 1 : 0, dt, 3);
-      var b = breath(now, TIMING.BREATH);
+      var b = root.FX.glowOverride ? root.FX.glowOverride() : breath(now, TIMING.BREATH);
       d.glow.style.transform = 'scale(' + (0.94 + 0.1 * b * amp).toFixed(4) + ')';
       d.glow.style.opacity = (0.15 + 0.35 * b * amp).toFixed(3);
     }
@@ -173,8 +178,12 @@
       if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { color = getComputedStyle(html).getPropertyValue('--sage').trim() || color; });
       syncClass();
     },
+    /* Other loops (the living background) join this one rather than starting their own. */
+    layer: function (l) { layers.push(l); syncClass(); ensure(); },
+    ensure: function () { ensure(); },
+    glowOverride: null,
     refresh: function () { /* call after state changes */
-      if (!cfg) return;
+      if (!cfg || !cfg.state) return;
       var running = cfg.state.phase === 'running';
       P.setRest(running && !cfg.paused() ? 'rise' : 'off');
       cfg.simEl.classList.toggle('live', running && onscreen && allowed());

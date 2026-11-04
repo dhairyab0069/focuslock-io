@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FocusLock: a calm focus timer for macOS</title>
 <meta name="description" content="FocusLock is a minimal macOS focus timer. A watchdog pauses the clock when an LLM is open, browsers are filtered for social media, and emergency killswitches mean it can never trap you. Try the simulator. The source is private for now.">
-<meta name="theme-color" content="#f6f3ee">
+<meta name="theme-color" content="#eef2ec">
 <link rel="canonical" href="https://dhairyab0069.github.io/focuslock-io/">
 <link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
 <meta property="og:type" content="website">
@@ -33,6 +33,8 @@
 </head>
 <body>
 <a class="skip" href="#main">Skip to the page</a>
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+<div id="fog" class="fog" aria-hidden="true"></div>
 
 <header class="bar">
   <div class="scrollbar" id="scrollbar" aria-hidden="true"></div>
@@ -43,9 +45,11 @@
       <a href="#filter">Filter</a>
       <a href="#exits">Emergency exits</a>
       <a href="#calm">Design</a>
+      <a href="#garden">Garden</a>
       <a href="#source">Source</a>
     </nav>
     <div class="switches" role="group" aria-label="Quiet settings">
+      <label class="sw" title="Fades every cursor effect: lantern, haze, ripples, growth, lean and glow"><input type="checkbox" id="sw-cursor"><span class="knob" aria-hidden="true"></span><span>Calm mode</span></label>
       <label class="sw"><input type="checkbox" id="sw-calm"><span class="knob" aria-hidden="true"></span><span>Stop all motion</span></label>
       <label class="sw"><input type="checkbox" id="sw-sound"><span class="knob" aria-hidden="true"></span><span>Sound</span></label>
       <button class="btn small" type="button" id="quiet-all">Quiet everything</button>
@@ -190,6 +194,35 @@
     </div>
   </section>
 
+  <!-- ========== GARDEN ========== -->
+  <section id="garden" aria-labelledby="garden-h">
+    <p class="eyebrow">A quiet corner</p>
+    <h2 id="garden-h">Rake the sand.</h2>
+    <p class="lead">Nothing here is timed or scored. Drag across the sand to rake it, move the stones, and smooth it flat again whenever you like. (A page extra, not part of the app.)</p>
+    <div class="garden-wrap" id="garden-wrap">
+      <canvas id="sand" aria-label="Sand garden. Drag to rake lines. Not required; buttons below make a pattern or smooth the sand."></canvas>
+      <button class="stone" type="button" aria-label="Stone one. Arrow keys move it."></button>
+      <button class="stone" type="button" aria-label="Stone two. Arrow keys move it."></button>
+      <button class="stone" type="button" aria-label="Stone three. Arrow keys move it."></button>
+    </div>
+    <div class="row wrapr" style="margin-top:.8rem">
+      <button class="btn" type="button" id="sand-wave" data-magnet>Rake a wave for me</button>
+      <button class="btn primary" type="button" id="sand-smooth" data-magnet>Smooth the sand</button>
+      <span class="hint" style="margin:0">Turn on Sound for a soft rake and water drop.</span>
+    </div>
+  </section>
+
+  <!-- ========== MOMENTS ========== -->
+  <section id="moments" aria-labelledby="moments-h">
+    <p class="eyebrow">If you want one</p>
+    <h2 id="moments-h">A moment, if it helps.</h2>
+    <div class="cards">
+      <article class="card"><h3>A 20 second pause</h3><p>A slow ring and a quiet count. Skip it any time.</p><button class="btn" type="button" id="moment-pause" data-magnet>Take a pause</button></article>
+      <article class="card"><h3>Five things you can see</h3><p>A simple grounding exercise that points at five things on this page, one at a time.</p><button class="btn" type="button" id="moment-ground" data-magnet>Start grounding</button></article>
+    </div>
+    <p class="hint">Page extras, and entirely optional. They are not medical advice or therapy, just a pause.</p>
+  </section>
+
   <!-- ========== NEEDS ========== -->
   <section id="needs" aria-labelledby="needs-h">
     <p class="eyebrow">Using it</p>
@@ -219,6 +252,22 @@
   </div>
 </footer>
 
+<div class="breathe" id="br-widget">
+  <div class="br-main">
+    <button class="br-ring" type="button" id="br-ring" aria-pressed="false" aria-label="Breathing guide. Hold this button, or hold Space or Enter on it, to breathe in and out at a calm pace."></button>
+    <span class="br-label" id="br-label" aria-hidden="true">Hold to breathe</span>
+  </div>
+  <details class="br-opts"><summary>Breathing and effects</summary>
+    <label>Pace <select id="br-preset" aria-label="Breathing pace"><option value="4-6" selected>In 4, out 6</option><option value="4-4">In 4, out 4</option><option value="box">Box 4-4-4-4</option></select></label>
+    <label class="row"><input type="checkbox" id="br-keep"><span>Keep going without holding</span></label>
+    <label class="row"><input type="checkbox" id="br-pace"><span>Pace the simulator's glow</span></label>
+    <label class="row"><input type="checkbox" id="br-follow"><span>Follow my pointer</span></label>
+    <label class="row"><input type="checkbox" id="opt-fog" checked><span>Haze that clears under the pointer</span></label>
+    <label class="row"><input type="checkbox" id="opt-growth" checked><span>Things grow where the pointer rests</span></label>
+    <button class="btn small" type="button" id="br-hide">Hide the breathing guide</button>
+  </details>
+</div>
+<button class="btn small br-show" type="button" id="br-show" hidden>Breathing guide</button>
 <div class="toasts" id="toasts"></div>
 <div class="sr" id="announce" role="status" aria-live="polite"></div>
 <script src="assets/ui.js"></script>
@@ -229,6 +278,7 @@
 <script src="assets/hash.js"></script>
 <script src="assets/challenge.js"></script>
 <script src="assets/wm.js"></script>
+<script src="assets/field.js"></script>
 <script src="assets/keys.js"></script>
 <script src="assets/sound.js"></script>
 <script src="assets/fx.js"></script>
@@ -236,5 +286,6 @@
 <script src="assets/desktop.js"></script>
 <script src="assets/panels.js"></script>
 <script src="assets/app.js"></script>
+<script src="assets/nature.js"></script>
 </body>
 </html>
