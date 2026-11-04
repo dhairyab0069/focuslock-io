@@ -50,7 +50,7 @@ The page is re-skinned in mist, sage, warm sand, deep-water teal and a touch of 
 - *Breathing guide:* a ring in the corner (or following the pointer). Hold it, or hold Space or Enter on it, to breathe at a calm pace (in 4 out 6, in 4 out 4, or box). It can pace the simulator's glow, can be hidden, and becomes words only when motion is off.
 - *Mindful moments:* an optional 20 second pause and a five-things grounding exercise. Page extras, not medical advice.
 
-The three symbols in the top bar (speaker, wave, lantern) switch sound, motion and cursor effects, all on by default, and the moon quiets all three at once (press again to bring them back). Turning the lantern off fades every cursor effect at once. The motion symbol, the moon and `prefers-reduced-motion` also stop the background loop (it becomes a still picture), the lantern, haze, lean and parallax. Everything joins the page's single animation loop in `assets/fx.js`, uses only canvas, transform and opacity, pauses when the tab is hidden, and is `aria-hidden` decoration.
+The three symbols in the top bar (speaker, wave, sparkle) switch sound, motion and cursor effects, all on by default, and the circle-and-bar button quiets all three at once (press again to bring them back). Turning the lantern off fades every cursor effect at once. The motion symbol, the moon and `prefers-reduced-motion` also stop the background loop (it becomes a still picture), the lantern, haze, lean and parallax. Everything joins the page's single animation loop in `assets/fx.js`, uses only canvas, transform and opacity, pauses when the tab is hidden, and is `aria-hidden` decoration.
 
 ## Quiet by design
 
