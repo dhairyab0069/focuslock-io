@@ -1,0 +1,1 @@
+{ "name": "focuslock-io", "private": true, "scripts": { "test": "node tests/run.js" } }

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FocusLock: a calm focus timer for macOS</title>
+<meta name="description" content="FocusLock is a minimal macOS focus timer. A watchdog pauses the clock when an LLM is open, browsers are filtered for social media, and emergency killswitches mean it can never trap you. Try the simulator. The source is private for now.">
+<meta name="theme-color" content="#f6f3ee">
+<link rel="canonical" href="https://dhairyab0069.github.io/focuslock-io/">
+<link rel="icon" type="image/png" sizes="64x64" href="assets/favicon-64.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="FocusLock: a calm focus timer for macOS">
+<meta property="og:description" content="A timer plus a distraction blocker, nothing else. The watchdog pauses the clock when an LLM is open; social media gets redirected; emergency exits always work. Try the simulator.">
+<meta property="og:url" content="https://dhairyab0069.github.io/focuslock-io/">
+<meta property="og:image" content="https://dhairyab0069.github.io/focuslock-io/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A soft green progress ring with the words FocusLock and a timer plus a distraction blocker, nothing else">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="FocusLock: a calm focus timer for macOS">
+<meta name="twitter:description" content="A timer plus a distraction blocker, nothing else. Try the simulator.">
+<meta name="twitter:image" content="https://dhairyab0069.github.io/focuslock-io/assets/og-image.png">
+<link rel="stylesheet" href="assets/style.css">
+<script>
+/* Apply saved quiet settings before first paint. Motion follows the system setting until you choose. */
+(function () {
+  var calm = null;
+  try { calm = localStorage.getItem('fl-calm'); } catch (e) {}
+  if (calm === null) calm = (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'on' : 'off';
+  document.documentElement.setAttribute('data-calm', calm);
+})();
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the page</a>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="#top">FocusLock</a>
+    <nav aria-label="Sections">
+      <a href="#try">Simulator</a>
+      <a href="#filter">Filter</a>
+      <a href="#exits">Emergency exits</a>
+      <a href="#calm">Design</a>
+      <a href="#source">Source</a>
+    </nav>
+    <div class="switches" role="group" aria-label="Quiet settings">
+      <label class="sw"><input type="checkbox" id="sw-calm"><span class="knob" aria-hidden="true"></span><span>Stop all motion</span></label>
+      <label class="sw"><input type="checkbox" id="sw-sound"><span class="knob" aria-hidden="true"></span><span>Sound</span></label>
+      <button class="btn small" type="button" id="quiet-all">Quiet everything</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<div class="wrap" id="top">
+
+  <div class="hero">
+    <div>
+      <p class="badge">macOS app &middot; source private for now</p>
+      <h1>A timer that tells the truth.</h1>
+      <p class="lead">FocusLock is a deliberately minimal focus app: a timer plus a distraction blocker, nothing else. Built for ADHD brains and LLM temptation. Every app on your Mac stays usable; only two things are policed.</p>
+      <div class="cta">
+        <a class="btn primary" href="#try">Try the simulator</a>
+        <a class="btn" href="#source">About the source</a>
+      </div>
+    </div>
+    <div class="breath" aria-hidden="true">
+      <svg viewBox="0 0 200 200">
+        <circle class="halo" cx="100" cy="100" r="86" fill="var(--sage-soft)"/>
+        <circle cx="100" cy="100" r="64" fill="none" stroke="var(--ring-track)" stroke-width="9"/>
+        <circle cx="100" cy="100" r="64" fill="none" stroke="var(--sage)" stroke-width="9" stroke-linecap="round" stroke-dasharray="402" stroke-dashoffset="100" transform="rotate(-90 100 100)"/>
+      </svg>
+      <div class="cap"><div><b>25:00</b>locked in</div></div>
+    </div>
+  </div>
+
+  <div class="cards">
+    <article class="card"><h3>LLMs pause your timer</h3><p>If a desktop LLM app or the Claude Code command line is running, the screen goes red and the countdown stops. No credit for cheated minutes. Close it and the session resumes by itself.</p></article>
+    <article class="card"><h3>Browsers are filtered, not blocked</h3><p>Search, documentation, YouTube and music all work, because concentration fuel is allowed on purpose. Social media and LLM websites get redirected away and counted.</p></article>
+    <article class="card"><h3>It can never trap you</h3><p>A pre-flight check, a 30 second grace button, an SOS button on every overlay, a keyboard shortcut and a terminal command. Ending early is one click.</p></article>
+  </div>
+  <p class="empty">A note on the name: the &ldquo;LLM watchdog&rdquo; is a watchdog <em>against</em> LLMs. It is ordinary code that looks at what is running; it is not itself a language model, and the app does not send anything anywhere.</p>
+
+  <!-- ========== SIMULATOR ========== -->
+  <section id="try" aria-labelledby="try-h">
+    <p class="eyebrow">Interactive simulator</p>
+    <h2 id="try-h">Run a session, then drift.</h2>
+    <p class="lead">This is a model of FocusLock running in your browser. It does not look at your computer, your tabs or your programs: the &ldquo;Mac&rdquo; below is pretend. Start a session, then open an LLM, visit a site, or reach for an exit, and read the <em>why</em> log.</p>
+    <noscript><p class="note-box">The simulator needs JavaScript. Everything else on this page works without it.</p></noscript>
+
+    <div class="sim" id="sim">
+      <div>
+        <div class="panel">
+          <h3>1. The pretend Mac</h3>
+          <fieldset>
+            <legend>Programs open right now</legend>
+            <p class="hint">Tick one to open it, untick to close it. The watchdog notices within 5 seconds.</p>
+            <div class="checks" id="apps"></div>
+          </fieldset>
+        </div>
+        <div class="panel">
+          <h3>2. The pretend browser</h3>
+          <p class="hint">Type an address or pick one. It is only checked while a session runs.</p>
+          <form class="tabbar" id="go-form" autocomplete="off">
+            <label class="sr" for="addr">Address</label>
+            <input type="text" id="addr" value="https://www.reddit.com/r/macapps" spellcheck="false" inputmode="url">
+            <button class="btn small primary" type="submit">Go</button>
+          </form>
+          <div class="chips" id="chips" role="group" aria-label="Example addresses"></div>
+          <div class="page-view" id="page-view" aria-live="polite">Tab: about:blank</div>
+          <label class="row" style="margin-top:.6rem"><input type="checkbox" id="automation" checked><span>Automation permission granted for this browser</span></label>
+        </div>
+        <div class="panel">
+          <h3>3. A pretend terminal</h3>
+          <div class="term">
+            <div class="out" id="term-out" aria-live="polite">Try: focuslock status, or focuslock unlock</div>
+            <form class="line" id="term-form" autocomplete="off"><span aria-hidden="true">$</span><label class="sr" for="term-in">Terminal command</label><input type="text" id="term-in" spellcheck="false" autocapitalize="off" placeholder="focuslock unlock"></form>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="stage" id="stage">
+          <div class="stage-note">The real overlay covers your whole screen; here it covers this box.</div>
+          <div class="win" id="win" aria-label="Simulated FocusLock window"></div>
+          <div id="overlay-slot"></div>
+        </div>
+        <div class="panel" style="margin-top:1rem">
+          <h3>Why did that happen?</h3>
+          <fieldset style="margin-bottom:.6rem">
+            <legend class="sr">Demo speed</legend>
+            <label class="row" for="speed"><span>Countdown speed</span>
+              <select id="speed" style="font:inherit;min-height:40px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:.2rem .6rem">
+                <option value="1">Real time</option><option value="10">10 times</option><option value="30" selected>30 times</option><option value="90">90 times</option>
+              </select></label>
+            <p class="hint" style="margin:.3rem 0 0">Only the countdown is sped up. The watchdog and the 30 second grace run in real time.</p>
+          </fieldset>
+          <ol class="log" id="log" aria-live="polite" aria-label="Event log"><li class="empty">Nothing yet. Start a session.</li></ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== FILTER ========== -->
+  <section id="filter" aria-labelledby="filter-h">
+    <p class="eyebrow">Browser filtering</p>
+    <h2 id="filter-h">A blocklist, not an allowlist.</h2>
+    <p class="lead">Blocking the whole web would make focus harder, not easier: you need search and documentation. So the filter only names the places that eat an hour.</p>
+    <ol class="steps">
+      <li><strong>It reads the front tab&rsquo;s address</strong> from Safari, Chrome, Brave, Edge or Arc, but only while that browser is the frontmost app. That is the one permission it asks for (Automation).</li>
+      <li><strong>It checks the host</strong> against the list. A match is the domain itself or any subdomain of it. Blank tabs, browser pages and local files are never filtered.</li>
+      <li><strong>If it matches,</strong> the tab is sent to a blank page, the miss is counted, and a short message says why. If it cannot read the tab (permission missing) the browser stays locked and says so.</li>
+    </ol>
+    <div class="panel">
+      <h3>Ask the filter about any address</h3>
+      <form class="tabbar" id="probe-form" autocomplete="off">
+        <label class="sr" for="probe">Address to check</label>
+        <input type="text" id="probe" value="https://old.reddit.com/r/adhd" spellcheck="false" inputmode="url">
+        <button class="btn small primary" type="submit">Check</button>
+      </form>
+      <div class="chips" id="probe-chips" role="group" aria-label="Examples"></div>
+      <div class="verdict" id="verdict" aria-live="polite"></div>
+    </div>
+    <div class="lists">
+      <div class="card"><h3>Redirected: social media</h3><ul class="tags" id="list-social"></ul></div>
+      <div class="card"><h3>Redirected: LLM sites</h3><ul class="tags" id="list-llm"></ul></div>
+      <div class="card"><h3>Left alone on purpose</h3><ul class="tags allowlist"><li>Search</li><li>Documentation</li><li>YouTube</li><li>YouTube Music</li><li>Spotify</li><li>Apple Music</li><li>SoundCloud</li><li>Everything else</li></ul><p style="margin-top:.8rem">The list lives in one table in the app: add your personal kryptonite, remove what you actually need, rebuild.</p></div>
+    </div>
+    <h3 style="margin-top:2rem">The other half: the LLM watchdog</h3>
+    <p>Outside the browser, the watchdog looks for LLM programs in two ways, because one is not enough: it asks macOS which desktop apps are running (Claude, ChatGPT, Perplexity, Copilot, Gemini), and it reads the full command lines of running processes to catch command line tools. Claude Code, for example, renames its process to its version number, so a plain name search misses it. A scan runs every 5 seconds; the browser check runs every 2.</p>
+  </section>
+
+  <!-- ========== EXITS ========== -->
+  <section id="exits" aria-labelledby="exits-h">
+    <p class="eyebrow">Emergency killswitches</p>
+    <h2 id="exits-h">A lock you can always open.</h2>
+    <p class="lead">A commitment device that traps you gets uninstalled. So there are several ways out, each ends everything at once, and you can try every one of them in the simulator above.</p>
+    <div class="exits">
+      <article class="card"><h3>Pre-flight check</h3><p>It refuses to start while an LLM is open, and lists exactly what to close, instead of dropping you onto a red screen. Tick &ldquo;Claude (app)&rdquo; in the simulator and press Lock in.</p></article>
+      <article class="card"><h3>Grace button</h3><p>The red screen offers &ldquo;Give me 30 seconds to close it.&rdquo; The clock stays paused but the screen stands down so you can reach the program.</p></article>
+      <article class="card"><h3>SOS button</h3><p>On every overlay, the emergency exit ends the session now. One click, no questions.</p></article>
+      <article class="card"><h3>Keyboard</h3><div class="kbd-row"><kbd>&#8984;</kbd><kbd>&#8679;</kbd><kbd>Esc</kbd></div><p>Works while an overlay is up. In the simulator, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Esc</kbd> works too.</p></article>
+      <article class="card"><h3>Terminal</h3><p><code>focuslock unlock</code> (or <code>stop</code>) from any terminal ends everything. <code>focuslock status</code> says whether it is running.</p></article>
+      <article class="card"><h3>Ending early</h3><p>One click on a confirmation that tells you how many minutes are left. No typing rituals. Quitting with &#8984;Q during a session opens the same question instead of quitting.</p></article>
+    </div>
+    <p style="margin-top:1.2rem">Honest limits: this is a commitment device, not a prison. <code>focuslock unlock</code> beats it, and your phone exists. Its job is to make drifting <em>loud and immediate</em> instead of silent, which is usually all a wandering brain needs to snap back.</p>
+  </section>
+
+  <!-- ========== CALM ========== -->
+  <section id="calm" aria-labelledby="calm-h">
+    <p class="eyebrow">Design</p>
+    <h2 id="calm-h">Low stimulation, on purpose.</h2>
+    <p class="lead">A focus tool that shouts is its own distraction. The app and this page follow the same few ideas.</p>
+    <div class="cards">
+      <article class="card"><h3>One job</h3><p>A timer and a blocker. No streaks, no scores, no feeds. The only counter is how many distractions were turned away.</p></article>
+      <article class="card"><h3>Loud only when it matters</h3><p>Quiet screens most of the time; a full-screen message only when you actually drift. Then it explains itself in one plain sentence.</p></article>
+      <article class="card"><h3>No friction to leave</h3><p>Anything that needs willpower to escape gets abandoned. Every exit is one step.</p></article>
+      <article class="card"><h3>Allow the fuel</h3><p>Music and reference material help people concentrate, so they are not policed.</p></article>
+      <article class="card"><h3>Yours to quiet</h3><p>On this page: large type, soft colours, no autoplay. <strong>Stop all motion</strong> and <strong>Sound</strong> are in the top bar; motion starts off if your system asks for reduced motion, and sound is always off until you switch it on. Both choices are remembered on this device only.</p></article>
+      <article class="card"><h3>Nothing leaves this page</h3><p>No trackers, no web fonts, no external requests. The simulator is code on this page, not a monitor.</p></article>
+    </div>
+  </section>
+
+  <!-- ========== NEEDS ========== -->
+  <section id="needs" aria-labelledby="needs-h">
+    <p class="eyebrow">Using it</p>
+    <h2 id="needs-h">What it needs.</h2>
+    <div class="cards">
+      <article class="card"><h3>A Mac</h3><p>macOS 14 or later. It is a small native app written in Swift and SwiftUI.</p></article>
+      <article class="card"><h3>One permission</h3><p>Automation, so it can read the front browser tab. Allow it in System Settings, Privacy and Security, Automation. Without it the browser stays locked during sessions and everything else still works.</p></article>
+      <article class="card"><h3>No account, no key</h3><p>There is nothing to sign in to and nothing to configure for the watchdog: it does not call an LLM, an API or any server.</p></article>
+    </div>
+  </section>
+
+  <!-- ========== SOURCE ========== -->
+  <section id="source" aria-labelledby="source-h">
+    <h2 id="source-h">About the source.</h2>
+    <div class="priv">
+      <p><strong>The source code is private for now.</strong> This page describes what FocusLock does and lets you try a simulation of its rules; it is not a download page and there is no public repository to link to yet.</p>
+      <p>The simulator is a separate model written for this page. Its rules and lists follow the app; no code, prompts or settings from the app are published here.</p>
+    </div>
+  </section>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>A project by Dhairya Bhatia. This page is a simulation: it does not monitor your programs, tabs or screen, and it stores only your two quiet settings in this browser. <a href="https://github.com/dhairyab0069/focuslock-io">Source of this page</a>.</p>
+  </div>
+</footer>
+
+<div class="sr" id="announce" role="status" aria-live="polite"></div>
+<script src="assets/core.js"></script>
+<script src="assets/sound.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
