@@ -15,6 +15,24 @@ Live at https://dhairyab0069.github.io/focuslock-io/ (GitHub Pages, served from 
 Static HTML, CSS and plain JavaScript; no build step, no libraries, no external requests (no web fonts, CDNs
 or trackers). Open `index.html` directly or run `python3 -m http.server 8000`.
 
+## The playable world
+
+The page is built around a pretend Mac you can use from the first second. It is all simulation: it never looks at the visitor's computer.
+
+- *Desktop:* windows you can drag (with a flick that glides), focus, stack, snap to an edge, minimise and close; a menu bar with menus, a right-click desktop menu, and a Dock. Keyboard: title bars move with the arrow keys (Shift resizes). On phones it shows one app at a time with the Dock.
+- *Apps:* Browser (tabs, address bar, Safari, Chrome or Firefox), Terminal (`focuslock start|stop|unlock|status|build`, a pretend `claude`, `top`, `ls` and a few more), Notes, Music, Messages, the FocusLock window itself, and Claude and ChatGPT stand-ins that say nothing and send nothing.
+- *Faithful rules:* the 5 second program scan (app names and command lines), the 2 second tab check of the front tab of a frontmost watched browser only (Firefox is not watched), pre-flight refusal, the grace button, the exits, quit asks first. These come from `assets/core.js` and `assets/rules.js`.
+- *Distractions:* scenarios send notification banners, tempting tabs and programs that start by themselves. Let it pass, snooze (up to 3 times), open it, or park it in Notes (drag it onto Notes). The scenario only advances while the clock runs.
+- *X-ray:* programs with matches highlighted and the reason, the front tab and the rule that matched, scan and tab-check countdowns, grace.
+- *Rules lab:* add and remove sites (drag suggestions in) and program patterns, change grace and session length, undo and redo, test a command line. Verdicts everywhere follow your rules.
+- *Try to break it:* 18 attempts (look-alike domains, subdomains, IP addresses, background tabs, an unwatched browser, a renamed program, and more), each judged against your current rules with the reason. A neutral tally, not a score.
+- *Practise the exits:* six short scenes, one per way out.
+- *History and stats:* a scrubbable timeline of each session and gentle totals. It celebrates coming back and counts no failures.
+- *Link:* "Copy link to my setup" puts your rules, scenario and preset in the URL hash (`#s=...`), validated on load.
+- *Tour and keys:* a skippable first-run tour (replay with `t`) and a cheat sheet on `?`.
+
+Page extras (not in the real app) are labelled on the page: scenarios and presets, the rules lab and custom grace or length, stats and history, the menu bar status item and the browser picker.
+
 ## Quiet by design
 
 - The top bar has **Stop all motion** (starts on if your system asks for reduced motion) and **Sound**
@@ -52,6 +70,8 @@ requests and contains no secrets or local paths.
 - `index.html` content and structure
 - `assets/core.js` rules and simulation (no DOM, tested)
 - `assets/app.js` simulator and probe UI
+- `assets/rules.js` editable rules, program scan, undo; `assets/scenario.js` presets, scenarios, scheduler; `assets/score.js` history and gentle summaries; `assets/hash.js` URL-hash state; `assets/challenge.js` break-it attempts; `assets/wm.js` window geometry; `assets/keys.js` shortcuts (all pure and tested)
+- `assets/state.js`, `desktop.js`, `panels.js`, `app.js`, `ui.js` page glue and UI
 - `assets/fx.js` motion: easing, particles, the single animation loop (pure parts tested)
 - `assets/sound.js` optional synthesized sound
 - `assets/style.css` calm, low-stimulation styling with a dark scheme

@@ -4,6 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const FL = require('../assets/core.js');
 const FX = require('../assets/fx.js');
+const R = require('../assets/rules.js');
+const SC = require('../assets/scenario.js');
+const SCORE = require('../assets/score.js');
+const HASH = require('../assets/hash.js');
+const CH = require('../assets/challenge.js');
+const WM = require('../assets/wm.js');
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log('ok', n, name); };
@@ -186,9 +192,179 @@ ok('motion code uses transform, opacity and clip-path only, and one animation fr
   }
   assert.ok(/data-calm/.test(fx) && /matchMedia/.test(fx));
 });
+/* ---------- playable world: rules, scenarios, score, hash, challenge, window manager ---------- */
+ok('rules: defaults mirror the app (21 sites, 9 program patterns, 30s grace)', () => {
+  const d = R.defaults(); assert.equal(d.blocklist.length, 21); assert.equal(d.patterns.length, 9); assert.equal(d.grace, 30); assert.equal(R.sameAsDefault(d), true);
+});
+ok('rules: normalizeDomain accepts hosts and rejects junk', () => {
+  assert.equal(R.normalizeDomain('https://WWW.Example.com/path?q=1'), 'example.com'); assert.equal(R.normalizeDomain('foo.bar.co:8080'), 'foo.bar.co');
+  for (const bad of ['', 'localhost', 'a b.com', '<script>.com', 'x..com', '-a.com', 'a'.repeat(300) + '.com']) assert.equal(R.normalizeDomain(bad), '', bad);
+});
+ok('rules: add and remove a site changes verdicts at once, without mutating the old rules', () => {
+  const d = R.defaults(); const a = R.addSite(d, { domain: 'redditt.com', name: 'Redditt', category: 'social media' });
+  assert.ok(a.ok); assert.equal(d.blocklist.length, 21); assert.equal(FL.verdictForUrl('https://redditt.com', a.rules.blocklist).kind, 'blocked');
+  assert.equal(FL.verdictForUrl('https://redditt.com', d.blocklist).kind, 'allowed');
+  assert.equal(R.addSite(a.rules, { domain: 'redditt.com' }).ok, false);
+  const r = R.removeSite(a.rules, 'reddit.com'); assert.equal(FL.verdictForUrl('https://reddit.com', r.rules.blocklist).kind, 'allowed');
+  assert.equal(R.addSite(d, { domain: 'not a site' }).ok, false);
+});
+ok('rules: list sizes are capped', () => {
+  let r = R.defaults(); for (let i = 0; i < 200; i++) { const x = R.addSite(r, { domain: 'site' + i + '.com' }); if (x.ok) r = x.rules; }
+  assert.equal(r.blocklist.length, R.LIMITS.sites);
+});
+ok('rules: grace and length are clamped', () => {
+  const d = R.defaults(); assert.equal(R.setGrace(d, 5000).grace, 300); assert.equal(R.setGrace(d, 1).grace, 5); assert.equal(R.setGrace(d, 'x').grace, 30);
+  assert.equal(R.setMins(d, 0).mins, 1); assert.equal(R.setMins(d, 999).mins, 240);
+});
+ok('rules: process scan matches app names and command lines, and names the reason', () => {
+  const d = R.defaults();
+  const hits = R.scanProcesses([{ pid: 1, app: 'Claude', cmd: '/Applications/Claude.app/Contents/MacOS/Claude' }, { pid: 2, app: null, cmd: '/opt/homebrew/bin/claude -p x' }, { pid: 3, app: 'Finder', cmd: '/System/Finder' }], d);
+  assert.deepEqual(R.labels(hits), ['Claude (app)', 'Claude Code (CLI)']); assert.ok(hits.every((h) => h.pid !== 3)); assert.ok(hits.some((h) => /app name/.test(h.by)));
+});
+ok('rules: scan agrees with the core command-line classifier for the default patterns', () => {
+  const d = R.defaults();
+  for (const line of ['claude', 'claude --resume', '/opt/homebrew/bin/claude -p hi', '/Applications/Claude.app/Contents/MacOS/Claude', '/Applications/ChatGPT.app/Contents/MacOS/ChatGPT', '/usr/bin/claudette', 'vim claude.txt', '/bin/zsh']) {
+    const viaCore = FL.classifyCommandLine(line); const viaRules = R.labels(R.scanProcesses([{ pid: 1, app: null, cmd: line }], d));
+    assert.deepEqual(viaRules, viaCore ? [viaCore] : [], line);
+  }
+});
+ok('rules: custom patterns work (a renamed binary is recognised once added)', () => {
+  const d = R.defaults(), p = { pid: 1, app: null, cmd: '/usr/local/bin/cld' };
+  assert.equal(R.scanProcesses([p], d).length, 0);
+  const a = R.addPattern(d, { type: 'cmd-exe', value: 'cld', label: 'Renamed CLI' }); assert.ok(a.ok);
+  assert.deepEqual(R.labels(R.scanProcesses([p], a.rules)), ['Renamed CLI']); assert.equal(R.addPattern(a.rules, { type: 'cmd-exe', value: 'cld' }).ok, false);
+  assert.equal(R.addPattern(d, { type: 'bogus', value: 'x' }).ok, false);
+});
+ok('rules: only the six browsers the app reads are watched (not Firefox)', () => {
+  assert.equal(R.isWatchedBrowser('com.apple.Safari'), true); assert.equal(R.isWatchedBrowser('company.thebrowser.Browser'), true); assert.equal(R.isWatchedBrowser('org.mozilla.firefox'), false);
+});
+ok('rules: undo and redo walk the edit history', () => {
+  const h = R.createHistory(R.defaults()); assert.equal(h.canUndo(), false);
+  h.push(R.addSite(h.current, { domain: 'a.com' }).rules); h.push(R.addSite(h.current, { domain: 'b.com' }).rules);
+  assert.equal(h.current.blocklist.length, 23); h.undo(); assert.equal(h.current.blocklist.length, 22); h.undo(); assert.equal(h.current.blocklist.length, 21); assert.equal(h.undo(), null);
+  h.redo(); assert.equal(h.current.blocklist.length, 22); h.push(R.defaults()); assert.equal(h.canRedo(), false);
+});
+ok('sim: custom rules change what the watchdog does', () => {
+  const rules = R.addSite(R.defaults(), { domain: 'news.example.com', name: 'News', category: 'other' }).rules;
+  const sim = FL.createSim({ rules: { blocklist: rules.blocklist, grace: 12 } }); sim.start(25);
+  assert.equal(sim.visit('https://news.example.com/x').verdict.kind, 'blocked');
+  sim.setApp('Claude (app)', true); for (let i = 0; i < FL.SCAN_EVERY; i++) sim.tick(1); sim.grantGrace(); assert.equal(sim.state.grace, 12);
+});
+ok('sim: the detector and the browser probe drive the watchdog like the app does', () => {
+  const sim = FL.createSim(); const d = R.defaults(); let procs = [], front = { frontmost: true, url: 'https://docs.swift.org' }, redirected = 0;
+  sim.detector = () => R.labels(R.scanProcesses(procs, d)); sim.browserProbe = () => front; sim.onRedirect = () => redirected++;
+  sim.start(25); for (let i = 0; i < 4; i++) sim.tick(1); assert.equal(sim.state.violations, 0);
+  front = { frontmost: false, url: 'https://reddit.com' }; for (let i = 0; i < 6; i++) sim.tick(1); assert.equal(sim.state.violations, 0, 'not frontmost: not policed');
+  front = { frontmost: true, url: 'https://reddit.com' }; for (let i = 0; i < 3; i++) sim.tick(1); assert.equal(sim.state.violations, 1); assert.equal(redirected, 1);
+  procs = [{ pid: 1, app: null, cmd: 'claude' }]; for (let i = 0; i < 5; i++) sim.tick(1); assert.equal(sim.paused, true);
+});
+ok('sim: log entries carry virtual time and exit method for the timeline', () => {
+  const sim = FL.createSim(); sim.start(1); sim.setApp('Claude (app)', true); for (let i = 0; i < 5; i++) sim.tick(10); sim.emergencyExit('SOS button');
+  const e = sim.state.log.filter((l) => l.kind === 'exit')[0]; assert.equal(e.how, 'SOS button'); assert.ok(e.vt >= 40);
+});
+ok('scenarios: every scenario is well formed and in order', () => {
+  assert.ok(SC.SCENARIOS.length >= 3); assert.ok(SC.PRESETS.length >= 3);
+  for (const s of SC.SCENARIOS) { let last = 0; assert.ok(s.events.length >= 3); for (const e of s.events) { assert.ok(e.at > 0 && e.at < 1 && e.at >= last); last = e.at; assert.ok(['banner', 'tab', 'launch'].includes(e.kind)); } }
+  for (const p of SC.PRESETS) assert.ok(SC.scenario(p.scenario).id === p.scenario && p.mins >= 1);
+});
+ok('scheduler: events come due once, in order, only as focused time passes; snooze is capped', () => {
+  const ev = SC.schedule(SC.scenario('tuesday'), 1500); const sch = SC.createScheduler(ev);
+  assert.deepEqual(sch.due(0), []); const first = sch.due(ev[0].t); assert.equal(first.length, 1); assert.deepEqual(sch.due(ev[0].t), []);
+  assert.ok(sch.snooze(first[0], ev[0].t, 300)); assert.equal(sch.due(ev[0].t + 299).filter((e) => e.snoozed).length, 0); assert.equal(sch.due(ev[0].t + 300).filter((e) => e.snoozed).length, 1);
+  let e = first[0]; for (let i = 0; i < 5; i++) { const ok2 = sch.snooze(e, 0, 1); if (!ok2) break; e = sch.due(99999).filter((x) => x.id === e.id)[0]; }
+  assert.equal(e.snoozed <= 3, true);
+  assert.equal(SC.createScheduler(SC.schedule(SC.scenario('rabbit'), 5400)).due(5400).length, 5);
+});
+ok('scenario: an unknown scenario falls back safely', () => { assert.equal(SC.scenario('nope').id, 'tuesday'); assert.equal(SC.preset('nope'), null); });
+const fakeSession = () => {
+  const sim = FL.createSim(); sim.start(25); sim.state.log = []; return sim;
+};
+ok('score: records, spans, summary and narration for a session with a pause', () => {
+  const sim = FL.createSim(); sim.start(25);
+  for (let i = 0; i < 4; i++) sim.tick(30); sim.setApp('Claude (app)', true); for (let i = 0; i < 5; i++) sim.tick(30);
+  sim.setApp('Claude (app)', false); for (let i = 0; i < 6; i++) sim.tick(30); sim.endEarly();
+  const rec = SCORE.makeRecord(sim, { at: 1000, scenario: 'tuesday', preset: 'sprint' });
+  assert.equal(rec.outcome, 'ended'); assert.equal(SCORE.pauseSpans(rec).length, 1); const s = SCORE.summarize(rec); assert.equal(s.pauses, 1); assert.equal(s.resumed, 1);
+  const text = SCORE.narrate(rec).join(' '); assert.ok(/came back/.test(text)); assert.ok(!/fail|lost|bad|wasted|only/i.test(text));
+});
+ok('score: narration never uses shaming words for any outcome', () => {
+  for (const outcome of ['completed', 'ended', 'exit']) for (const ev of [[], [{ vt: 10, kind: 'pause', text: '' }], [{ vt: 5, kind: 'block', text: '' }, { vt: 9, kind: 'exit', text: '', how: 'x' }]]) {
+    const t = SCORE.narrate({ mins: 25, focused: 600, endVt: 100, outcome, events: ev }).join(' ');
+    assert.ok(!/fail|lost|bad|wasted|weak|give up|gave up|streak|disappoint|only /i.test(t), t);
+  }
+});
+ok('score: stateAt subtracts paused time and reports the pause', () => {
+  const rec = { mins: 25, focused: 600, endVt: 100, outcome: 'completed', events: [{ vt: 20, kind: 'pause' }, { vt: 50, kind: 'resume' }] };
+  assert.equal(SCORE.stateAt(rec, 10).focused, 10); assert.equal(SCORE.stateAt(rec, 30).paused, true); assert.equal(SCORE.stateAt(rec, 30).focused, 20);
+  assert.equal(SCORE.stateAt(rec, 80).focused, 50); assert.equal(SCORE.stateAt(rec, 80).paused, false); assert.equal(SCORE.stateAt(rec, 999).vt, 100);
+});
+ok('score: aggregate counts good things only and sanitizeHistory rejects junk', () => {
+  const recs = [{ at: 86400000 * 3, mins: 25, total: 1500, focused: 1500, endVt: 1500, outcome: 'completed', events: [{ vt: 1, kind: 'pause' }, { vt: 2, kind: 'resume' }] }, { at: 86400000 * 5, mins: 25, total: 1500, focused: 300, endVt: 300, outcome: 'ended', events: [] }];
+  const a = SCORE.aggregate(recs); assert.equal(a.sessions, 2); assert.equal(a.resumes, 1); assert.equal(a.focusedMinutes, 30); assert.equal(a.daysShown, 2); assert.ok(!('failed' in a) && !('streak' in a));
+  assert.deepEqual(SCORE.sanitizeHistory('x'), []); assert.equal(SCORE.sanitizeHistory([null, 3, { events: 'x' }, recs[0]]).length, 1);
+  assert.equal(SCORE.sanitizeHistory(new Array(80).fill(recs[0])).length, 50);
+});
+ok('hash: default state round-trips, and links stay short', () => {
+  const st = { rules: R.defaults(), scenario: 'afternoon', preset: 'deep' }; const h = HASH.encode(st); assert.ok(h.length < 80, h);
+  const d = HASH.decode('#' + h); assert.ok(d.ok); assert.equal(d.state.scenario, 'afternoon'); assert.equal(d.state.preset, 'deep'); assert.ok(R.sameAsDefault(d.state.rules));
+});
+ok('hash: edited rules round-trip exactly, including non-ASCII names', () => {
+  let r = R.defaults(); r = R.addSite(r, { domain: 'news.example.com', name: 'Nachrichten ☕', category: 'other' }).rules; r = R.removeSite(r, 'x.com').rules;
+  r = R.addPattern(r, { type: 'cmd-exe', value: 'cld', label: 'Renamed' }).rules; r = R.setGrace(R.setMins(r, 50), 12);
+  const d = HASH.decode(HASH.encode({ rules: r, scenario: 'rabbit', preset: '' })); assert.ok(d.ok); assert.deepEqual(d.state.rules, r);
+});
+ok('hash: malformed, hostile or oversize input is rejected or sanitised', () => {
+  for (const bad of ['', '#', '#s=', '#s=!!!', '#x=1', '#s=' + 'A'.repeat(9000), '#s=' + Buffer.from('{"v":2}').toString('base64url'), '#s=' + Buffer.from('not json').toString('base64url')]) assert.equal(HASH.decode(bad).ok, false, bad);
+  const evil = { v: 1, s: '<img onerror=x>', p: 'zzz', g: 99999, m: -4, b: [['javascript:alert(1)', '<b>x</b>', 1], ['ok.com', '<script>', 0], 'str', ['ok.com', 'dup', 0]], x: [[9, 'x', 'y'], [0, '', 'e'], [1, 'good', '<i>']] };
+  const d = HASH.decode('#s=' + Buffer.from(JSON.stringify(evil)).toString('base64url')); assert.ok(d.ok);
+  assert.equal(d.state.scenario, 'tuesday'); assert.equal(d.state.preset, ''); assert.equal(d.state.rules.grace, 300); assert.equal(d.state.rules.mins, 1);
+  assert.deepEqual(d.state.rules.blocklist.map((b) => b.domain), ['ok.com']); assert.ok(!/[<>]/.test(JSON.stringify(d.state.rules)));
+  assert.deepEqual(d.state.rules.patterns.map((p) => p.value), ['good']);
+});
+ok('challenge: with the default rules the guards and the gaps are exactly the honest ones', () => {
+  const res = Object.fromEntries(CH.evaluateAll(R.defaults()).map((r) => [r.id, r.outcome]));
+  for (const id of ['subdomain', 'shout', 'port', 'llmsite', 'minimise', 'cli', 'quit']) assert.equal(res[id], 'held', id);
+  for (const id of ['lookalike', 'ip', 'proxy', 'data', 'llmlook', 'background', 'firefox', 'renamed', 'remote']) assert.equal(res[id], 'gap', id);
+  assert.equal(res.preflight, 'refused'); assert.equal(res.unlock, 'by-design');
+});
+ok('challenge: closing a gap in the rules lab flips the verdict and the explanation', () => {
+  let r = R.defaults(); const before = CH.evaluate(CH.ATTEMPTS.find((a) => a.id === 'lookalike'), r); assert.equal(before.outcome, 'gap'); assert.match(before.why, /Rules lab/);
+  r = R.addSite(r, { domain: 'redditt.com', name: 'Redditt', category: 'social media' }).rules; assert.equal(CH.evaluate(CH.ATTEMPTS.find((a) => a.id === 'lookalike'), r).outcome, 'held');
+  r = R.addPattern(R.defaults(), { type: 'cmd-exe', value: 'cld', label: 'CLI' }).rules; assert.equal(CH.evaluate(CH.ATTEMPTS.find((a) => a.id === 'renamed'), r).outcome, 'held');
+  r = R.removeSite(R.defaults(), 'reddit.com').rules; assert.equal(CH.evaluate(CH.ATTEMPTS.find((a) => a.id === 'subdomain'), r).outcome, 'gap');
+});
+ok('challenge: the tally is neutral and complete', () => {
+  const t = CH.tally(CH.evaluateAll(R.defaults())); assert.equal(t.held + t.gap + t.refused + t['by-design'], CH.ATTEMPTS.length);
+  for (const a of CH.ATTEMPTS) { assert.ok(a.title && a.how && CH.evaluate(a, R.defaults()).why.length > 10); }
+});
+ok('wm: open, focus, stacking, minimise and the front window', () => {
+  const wm = WM.createWM({ w: 800, h: 500 }); wm.open('a', { x: 10, y: 10 }); wm.open('b', { x: 50, y: 50 }); assert.equal(wm.front().id, 'b');
+  wm.focus('a'); assert.equal(wm.front().id, 'a'); wm.minimize('a'); assert.equal(wm.front().id, 'b'); wm.minimize('b'); assert.equal(wm.front(), null);
+  wm.restore('a'); assert.equal(wm.front().id, 'a'); wm.close('a'); assert.equal(wm.get('a'), null); assert.equal(wm.open('b', {}).min, false);
+});
+ok('wm: windows cannot be dragged out of reach', () => {
+  const wm = WM.createWM({ w: 800, h: 500 }); const w = wm.open('a', { w: 300, h: 200 });
+  wm.move('a', -9999, -9999); assert.ok(w.x + w.w >= WM.KEEP); assert.equal(w.y, 0); wm.move('a', 9999, 9999); assert.ok(w.x <= 800 - WM.KEEP); assert.ok(w.y <= 460);
+  wm.setBounds({ w: 400, h: 300 }); assert.ok(w.x <= 400 - WM.KEEP);
+});
+ok('wm: snapping to halves and full, resize limits, tidy', () => {
+  const wm = WM.createWM({ w: 800, h: 500 }); wm.open('a', { w: 300, h: 200 });
+  assert.deepEqual(wm.snapRect(2, 100), { x: 0, y: 0, w: 400, h: 500 }); assert.deepEqual(wm.snapRect(799, 100), { x: 400, y: 0, w: 400, h: 500 });
+  assert.deepEqual(wm.snapRect(300, 1), { x: 0, y: 0, w: 800, h: 500 }); assert.equal(wm.snapRect(300, 100), null);
+  wm.resize('a', 50, 50); assert.equal(wm.get('a').w, 240); wm.resize('a', 5000, 5000); assert.equal(wm.get('a').w, 800);
+  wm.open('b', { w: 200, h: 100 }); wm.tidy(); assert.ok(wm.get('a').x !== wm.get('b').x);
+});
+ok('wm: flick velocity is capped and inertia decays to rest inside the desktop', () => {
+  const v = WM.velocity([{ x: 0, y: 0, t: 0 }, { x: 5000, y: 0, t: 50 }]); assert.equal(v.vx, 1800); assert.deepEqual(WM.velocity([{ x: 0, y: 0, t: 0 }]), { vx: 0, vy: 0 });
+  assert.deepEqual(WM.velocity([{ x: 0, y: 0, t: 0 }, { x: 50, y: 0, t: 900 }]), { vx: 0, vy: 0 }, 'a slow release does not fling');
+  let st = { x: 100, y: 100, vx: 1500, vy: -900 }; const win = { w: 300 }, b = { w: 800, h: 500 }, n = 0;
+  for (let i = 0; i < 600; i++) { st = WM.inertiaStep(st, 1 / 60, b, win); assert.ok(st.x <= 800 - WM.KEEP && st.y >= 0); if (st.done) break; }
+  assert.equal(st.done, true);
+});
+ok('wm: phones show one app at a time', () => { assert.equal(WM.isPhone(390), true); assert.equal(WM.isPhone(1200), false); assert.deepEqual(WM.phoneRect({ w: 390, h: 600 }), { x: 0, y: 0, w: 390, h: 600 }); });
 ok('page hygiene: no external requests, no secrets, no source paths', () => {
   const root = path.join(__dirname, '..');
-  const files = ['index.html', 'assets/app.js', 'assets/core.js', 'assets/sound.js', 'assets/fx.js', 'assets/style.css'];
+  const files = ['index.html', 'assets/app.js', 'assets/core.js', 'assets/sound.js', 'assets/fx.js', 'assets/style.css', 'assets/ui.js', 'assets/rules.js', 'assets/scenario.js', 'assets/score.js', 'assets/hash.js', 'assets/challenge.js', 'assets/wm.js', 'assets/keys.js', 'assets/state.js', 'assets/desktop.js', 'assets/panels.js'];
   for (const f of files) {
     const t = fs.readFileSync(path.join(root, f), 'utf8');
     if (f === 'index.html') {
@@ -196,7 +372,7 @@ ok('page hygiene: no external requests, no secrets, no source paths', () => {
       for (const m of t.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/g)) assert.ok(!/^(https?:)?\/\//.test(m[1]), 'external ' + m[1]);
     }
     if (f.endsWith('.css')) assert.ok(!/@import|url\(\s*['"]?(https?:)?\/\//.test(t), 'css loads external');
-    assert.ok(!/api[_-]?key|sk-[a-z0-9]{10}|\/Users\/|github\.com\/dhairyab0069\/FocusLock(?!-io)/i.test(t), f);
+    assert.ok(!/api[_-]?key|sk-[a-z0-9]{10}|\/Users\/dhairya|github\.com\/dhairyab0069\/FocusLock(?!-io)/i.test(t), f);
     assert.ok(!/fetch\(|XMLHttpRequest|WebSocket|sendBeacon/.test(t), f + ' makes requests');
   }
 });

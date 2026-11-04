@@ -27,6 +27,14 @@
     o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.05);
   }
   var SOUNDS = {
+    open:   function () { tone(480, 0, 0.1, 0.03); tone(640, 0.06, 0.12, 0.025); },
+    close:  function () { tone(420, 0, 0.1, 0.025); },
+    snap:   function () { tone(300, 0, 0.07, 0.04, 'triangle'); },
+    notify: function () { tone(660, 0, 0.12, 0.03); tone(880, 0.1, 0.16, 0.025); },
+    pass:   function () { tone(520, 0, 0.2, 0.03); tone(660, 0.1, 0.25, 0.03); },
+    tab:    function () { tone(700, 0, 0.06, 0.025); },
+    drop:   function () { tone(240, 0, 0.12, 0.05, 'triangle'); },
+    celebrate: function () { tone(523.25, 0, 0.3, 0.04); tone(659.25, 0.1, 0.3, 0.04); tone(783.99, 0.2, 0.5, 0.04); },
     scan:   function () { tone(880, 0, 0.09, 0.015); },
     type:   function () { tone(1250, 0, 0.04, 0.012); },
     stamp:  function () { tone(190, 0, 0.18, 0.06, 'triangle'); tone(380, 0.02, 0.1, 0.025); },

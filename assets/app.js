@@ -1,134 +1,20 @@
-/* FocusLock page: wires the simulator and the filter probe to assets/core.js. */
+/* FocusLock page: glue. The FocusLock window itself, the overlay, the one-second clock, scenario distractions
+   and banners, keyboard shortcuts, the quiet switches and the filter probe. */
 (function () {
   'use strict';
-  var FL = window.FL, snd = window.FLSound;
-  var $ = function (id) { return document.getElementById(id); };
-  var root = document.documentElement;
-  var sim = FL.createSim(), S = sim.state;
+  var UI = window.FLUI, el = UI.el, $ = UI.$, restart = UI.restart, later = UI.later, announce = UI.announce, G = window.FLG, FL = window.FL, R = window.FLRules, SC = window.FLScenario, SCORE = window.FLScore, K = window.FLKeys, snd = window.FLSound;
+  var sim = G.sim, S = sim.state, root = document.documentElement, sched = null, sheet = false, lastViolations = 0;
 
-  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-  function el(tag, attrs, kids) {
-    var n = document.createElement(tag);
-    Object.keys(attrs || {}).forEach(function (k) {
-      if (k === 'text') n.textContent = attrs[k];
-      else if (k === 'on') Object.keys(attrs.on).forEach(function (e) { n.addEventListener(e, attrs.on[e]); });
-      else n.setAttribute(k, attrs[k]);
-    });
-    (kids || []).forEach(function (c) { n.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
-    return n;
-  }
-  function announce(t) { $('announce').textContent = t; }
-  function restart(node, cls) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); }
-  function later(fn, ms) { setTimeout(fn, ms); }
-
-  /* ---- quiet settings ---- */
+  /* ---------- quiet settings ---------- */
   var calm = $('sw-calm'), sound = $('sw-sound');
   calm.checked = root.getAttribute('data-calm') === 'on';
-  calm.addEventListener('change', function () {
-    root.setAttribute('data-calm', calm.checked ? 'on' : 'off'); store('fl-calm', calm.checked ? 'on' : 'off');
-  });
+  calm.addEventListener('change', function () { root.setAttribute('data-calm', calm.checked ? 'on' : 'off'); UI.save('fl-calm', calm.checked ? 'on' : 'off'); });
   sound.addEventListener('change', function () { snd.set(sound.checked); snd.play('click'); });
-  $('quiet-all').addEventListener('click', function () {
-    calm.checked = true; calm.dispatchEvent(new Event('change'));
-    sound.checked = false; snd.set(false);
-    announce('Motion and sound are off.');
-  });
+  $('quiet-all').addEventListener('click', function () { calm.checked = true; calm.dispatchEvent(new Event('change')); sound.checked = false; snd.set(false); announce('Motion and sound are off.'); });
 
-  /* ---- pretend Mac: programs ---- */
-  var apps = $('apps'), sweepEl = el('div', { class: 'sweep', 'aria-hidden': 'true' });
-  apps.appendChild(sweepEl);
-  FL.LLM_PROGRAMS.forEach(function (name, i) {
-    var cb = el('input', { type: 'checkbox', id: 'app' + i });
-    cb.addEventListener('change', function () { sim.setApp(name, cb.checked); render(); });
-    apps.appendChild(el('label', { for: 'app' + i, class: 'approw' }, [cb, el('span', { text: name })]));
-  });
-
-  /* ---- pretend browser ---- */
-  var SAMPLES = [['https://www.reddit.com/r/macapps', 'no'], ['https://x.com/home', 'no'], ['https://claude.ai/chat', 'no'],
-    ['https://www.youtube.com/watch?v=lofi', 'ok'], ['https://open.spotify.com', 'ok'], ['https://developer.apple.com/documentation', 'ok'], ['https://www.google.com/search?q=pomodoro', 'ok']];
-  function hostOf(u) { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; } }
-  SAMPLES.forEach(function (s) {
-    $('chips').appendChild(el('button', { type: 'button', class: 'chip ' + s[1], text: hostOf(s[0]), on: { click: function () { typeInto($('addr'), s[0]); visit(s[0]); } } }));
-  });
-  function normalize(v) { v = v.trim(); return v && !/^[a-z][a-z0-9+.-]*:/i.test(v) ? 'https://' + v : v; }
-  /* Cosmetic: the address types itself out. The visit itself is applied at once, so no control waits for it. */
-  function typeInto(input, text) {
-    input.value = text;
-    if (!FX.on()) return;
-    var t = 0, dur = Math.min(450, 16 * text.length);
-    input.value = '';
-    snd.play('type');
-    var ok = FX.task(function (dt) {
-      t += dt * 1000; input.value = FX.pure.typingSlice(text, t, dur);
-      if (t >= dur) { input.value = text; return false; }
-    });
-    if (!ok) input.value = text;
-  }
-  function visit(given) {
-    var url = normalize(given || $('addr').value), before = S.log.length;
-    sim.visit(url);
-    var last = S.log[S.log.length - 1];
-    if (S.phase === 'running' && S.log.length > before && last.kind === 'block') { snd.play('block'); FX.distract(); restart($('page-view'), 'slide'); }
-    if (S.phase !== 'running') $('page-view').textContent = 'Tab: ' + url + '  (no session running, so nothing is filtered)';
-    render();
-  }
-  $('go-form').addEventListener('submit', function (e) { e.preventDefault(); visit(); });
-  $('automation').addEventListener('change', function () { S.automation = this.checked; });
-
-  /* ---- terminal ---- */
-  $('term-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var cmd = $('term-in').value.trim().replace(/\s+/g, ' '); $('term-in').value = '';
-    var out = '';
-    if (cmd === 'focuslock status') out = S.phase === 'running' ? 'FocusLock is running (pid 4242).' : 'FocusLock is not running.';
-    else if (cmd === 'focuslock unlock' || cmd === 'focuslock stop') {
-      if (sim.emergencyExit('focuslock unlock')) { out = 'FocusLock stopped: session over.'; snd.play('exit'); } else out = "FocusLock wasn't running.";
-    } else if (cmd === '') out = '';
-    else out = 'Usage: focuslock [start|stop|unlock|status|build]  (the simulator knows status, unlock and stop)';
-    $('term-out').textContent = cmd + '\n' + out;
-    render();
-  });
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && e.shiftKey && (e.metaKey || e.ctrlKey) && S.overlay) {
-      e.preventDefault();
-      if (sim.emergencyExit('keyboard shortcut')) { snd.play('exit'); render(); }
-    }
-  });
-
-  /* ---- FocusLock window ---- */
-  var win = $('win'), minutes = 25, sheet = false, lastMin = 25;
-  var C = 2 * Math.PI * 80;
-
-  function chrome() {
-    return el('div', { class: 'chrome' }, [el('i'), el('i'), el('i'), el('span', { text: 'FocusLock' })]);
-  }
-  function setupView() {
-    var seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Session length' });
-    [25, 45, 60, 90].forEach(function (m) {
-      var r = el('input', { type: 'radio', name: 'mins', id: 'm' + m, value: m });
-      if (m === minutes) r.checked = true;
-      r.addEventListener('change', function () { minutes = m; render(); });
-      seg.appendChild(el('label', { for: 'm' + m }, [r, el('span', { text: m + ' min' })]));
-    });
-    var kids = [
-      el('h3', { text: 'FocusLock' }),
-      el('p', { class: 'meta', style: 'text-align:left', text: 'A timer plus a distraction blocker, nothing more. Every app stays usable. Social media and LLM sites get redirected; any LLM program pauses your timer until you close it.' }),
-      seg, el('div', { class: 'spacer' })
-    ];
-    if (S.blockers.length) {
-      var ul = el('ul'); S.blockers.forEach(function (b) { ul.appendChild(el('li', { text: b })); });
-      kids.push(el('div', { class: 'note-box', role: 'alert' }, [el('strong', { text: 'Close these before locking in:' }), ul,
-        el('span', { text: 'Starting with an LLM open would drop you straight onto a paused screen. Untick them in the pretend Mac, then try again.' })]));
-    }
-    kids.push(el('button', { class: 'btn primary', type: 'button', id: 'lock', text: S.blockers.length ? 'I closed them: check again and lock in' : 'Lock in for ' + minutes + ' minutes',
-      on: { click: function () { lastMin = minutes; var r = sim.start(minutes); if (r.ok) { FX.resetDial(); snd.play('start'); announce('Session started.'); scanPulse(); } else announce('Close ' + r.blockers.join(', ') + ' first.'); render(); } } }));
-    return kids;
-  }
-  /* The dial is built once and kept, so its ring and glow animate smoothly across re-renders. */
-  var NS = 'http://www.w3.org/2000/svg';
-  var dialNode = el('div', { class: 'dial', role: 'timer' }), dialSvg = document.createElementNS(NS, 'svg'),
-      dialGlow = el('div', { class: 'glow', 'aria-hidden': 'true' }), dialText = el('div', { class: 't' });
+  /* ---------- the FocusLock window ---------- */
+  var C = 2 * Math.PI * 80, NS = 'http://www.w3.org/2000/svg';
+  var dialNode = el('div', { class: 'dial', role: 'timer' }), dialSvg = document.createElementNS(NS, 'svg'), dialGlow = el('div', { class: 'glow', 'aria-hidden': 'true' }), dialText = el('div', { class: 't' });
   dialSvg.setAttribute('viewBox', '0 0 190 190'); dialSvg.setAttribute('aria-hidden', 'true');
   dialSvg.innerHTML = '<circle class="track" cx="95" cy="95" r="80"></circle><circle class="prog" cx="95" cy="95" r="80" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + C.toFixed(1) + '"></circle>';
   dialNode.appendChild(dialGlow); dialNode.appendChild(dialSvg); dialNode.appendChild(dialText);
@@ -141,174 +27,280 @@
     FX.setDial(frac());
   }
 
+  var flBody = null, lastKey = '';
+  G.buildFocusLock = function (body) { flBody = body; lastKey = ''; return { render: flRender }; };
+  G.askEnd = function () { if (S.phase === 'running') { sheet = true; G.bus.emit('quit-sheet'); lastKey = ''; flRender(); G.openApp('focuslock', { quiet: true }); later(function () { var k = $('keep'); if (k) k.focus(); }, 0); } };
+
+  function flRender() {
+    if (!flBody) return;
+    var phase = S.phase, mins = G.rules.mins;
+    if (phase !== 'running') sheet = false;
+    var key = phase + '|' + (phase === 'running' ? sim.paused + '|' + S.violations + '|' + sheet + (sheet ? Math.ceil(S.remaining / 60) : '') : mins + '|' + S.blockers.join());
+    if (phase === 'running') updateDial();
+    if (key !== lastKey) {
+      var focusedId = document.activeElement && flBody.contains(document.activeElement) ? document.activeElement.id : '';
+      flBody.textContent = '';
+      (phase === 'running' ? sessionView() : phase === 'finished' ? finishedView() : setupView()).forEach(function (k) { flBody.appendChild(k); });
+      if (focusedId && $(focusedId)) $(focusedId).focus();
+      lastKey = key; lastViolations = S.violations;
+    }
+  }
+  function setupView() {
+    var mins = G.rules.mins, opts = [25, 45, 60, 90]; if (opts.indexOf(mins) < 0) opts.push(mins); opts.sort(function (a, b) { return a - b; });
+    var seg = el('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Session length' });
+    opts.forEach(function (m) {
+      var r = el('input', { type: 'radio', name: 'mins', id: 'm' + m, value: m }); if (m === mins) r.checked = true;
+      r.addEventListener('change', function () { G.setRules(R.setMins(G.rules, m)); });
+      seg.appendChild(el('label', { for: 'm' + m }, [r, el('span', { text: m + ' min' })]));
+    });
+    var kids = [el('h3', { text: 'FocusLock' }),
+      el('p', { class: 'meta left', text: 'A timer plus a distraction blocker, nothing more. Every app stays usable. Social media and LLM sites get redirected; any LLM program pauses your timer until you close it.' }), seg, el('div', { class: 'spacer' })];
+    if (S.blockers.length) {
+      var ul = el('ul'); S.blockers.forEach(function (b) { ul.appendChild(el('li', { text: b })); });
+      kids.push(el('div', { class: 'note-box', role: 'alert' }, [el('strong', { text: 'Close these before locking in:' }), ul, el('span', { text: 'Starting with an LLM open would drop you straight onto a paused screen. Close them (the Dock or the X-ray panel can quit them), then try again.' })]));
+    }
+    kids.push(el('button', { class: 'btn primary', type: 'button', id: 'lock', 'data-magnet': '', text: S.blockers.length ? 'I closed them: check again and lock in' : 'Lock in for ' + mins + ' minutes', on: { click: function () { G.lockIn(); } } }));
+    return kids;
+  }
   function sessionView() {
-    var paused = sim.paused;
-    updateDial();
-    var kids = [
-      el('div', { class: 'status ' + (paused ? 'paused' : 'ok'), text: paused ? 'Paused: LLM detected' : 'Locked in' }),
-      dialNode,
-      el('div', { class: 'meta' + (S.violations !== lastViolations ? ' bump' : ''), text: S.violations ? S.violations + ' distraction' + (S.violations === 1 ? '' : 's') + ' blocked' + (S.last ? ' · last: ' + S.last : '') : '' }),
-      el('div', { class: 'spacer' })
-    ];
+    var paused = sim.paused; updateDial();
+    var kids = [el('div', { class: 'status ' + (paused ? 'paused' : 'ok'), text: paused ? 'Paused: LLM detected' : 'Locked in' }), dialNode,
+      el('div', { class: 'meta' + (S.violations !== lastViolations ? ' bump' : ''), text: S.violations ? S.violations + ' distraction' + (S.violations === 1 ? '' : 's') + ' blocked' + (S.last ? ' · last: ' + S.last : '') : '' }), el('div', { class: 'spacer' })];
     if (sheet) {
-      kids.push(el('div', { class: 'sheet', role: 'alertdialog', 'aria-label': 'End the session early?' }, [
-        el('strong', { text: 'End the session early?' }), el('div', { class: 'meta', style: 'text-align:left', text: Math.ceil(S.remaining / 60) + ' minutes left on the clock.' }),
-        el('div', { class: 'row' }, [
-          el('button', { class: 'btn primary small', type: 'button', id: 'keep', text: 'Keep going', on: { click: function () { sheet = false; render(); } } }),
-          el('button', { class: 'btn warn small', type: 'button', text: 'End session', on: { click: function () { sheet = false; sim.endEarly(); snd.play('exit'); render(); } } })])]));
+      kids.push(el('div', { class: 'sheet', role: 'alertdialog', 'aria-label': 'End the session early?' }, [el('strong', { text: 'End the session early?' }),
+        el('div', { class: 'meta left', text: Math.ceil(S.remaining / 60) + ' minutes left on the clock.' }),
+        el('div', { class: 'row between' }, [el('button', { class: 'btn primary small', type: 'button', id: 'keep', text: 'Keep going', on: { click: function () { sheet = false; G.render(); } } }),
+          el('button', { class: 'btn warn small', type: 'button', text: 'End session', on: { click: function () { sheet = false; sim.endEarly(); snd.play('exit'); G.render(); } } })])]));
     } else {
-      kids.push(el('button', { class: 'btn warn small', type: 'button', text: 'End session early…', on: { click: function () { sheet = true; render(); setTimeout(function () { var k = $('keep'); if (k) k.focus(); }, 0); } } }));
-      kids.push(el('button', { class: 'linkbtn', type: 'button', text: 'Quit FocusLock (⌘Q)', title: 'Quitting during a session asks first instead of quitting', on: { click: function () { sheet = true; render(); } } }));
+      kids.push(el('button', { class: 'btn warn small', type: 'button', text: 'End session early…', on: { click: function () { G.askEnd(); } } }));
+      kids.push(el('button', { class: 'linkbtn', type: 'button', text: 'Quit FocusLock (⌘Q)', title: 'Quitting during a session asks first instead of quitting', on: { click: function () { G.askEnd(); } } }));
     }
     return kids;
   }
   function finishedView() {
-    return [el('div', { class: 'spacer' }), el('h3', { text: 'Session complete', style: 'text-align:center' }),
+    return [el('div', { class: 'spacer' }), el('h3', { text: 'Session complete', class: 'center' }),
       el('div', { class: 'meta', text: Math.round(S.total / 60) + ' focused minutes · ' + S.violations + ' distraction' + (S.violations === 1 ? '' : 's') + ' blocked' }),
-      el('button', { class: 'btn primary', type: 'button', text: 'Start another', on: { click: function () { sim.reset(); render(); } } }), el('div', { class: 'spacer' })];
+      el('button', { class: 'btn primary', type: 'button', text: 'Start another', on: { click: function () { sim.reset(); G.render(); } } }), el('div', { class: 'spacer' })];
   }
+  G.renderers.push(flRender);
 
+  /* ---------- sessions ---------- */
+  G.lockIn = function () {
+    if (!G.isOpen('focuslock')) G.openApp('focuslock', { quiet: true });
+    var r = sim.start(G.rules.mins);
+    if (r.ok) {
+      FX.resetDial(); snd.play('start'); announce('Session started.');
+      sched = G.prefs.distractions ? SC.createScheduler(SC.schedule(SC.scenario(G.scenarioId), S.total)) : null;
+      scanPulse();
+    } else announce('Close ' + r.blockers.join(', ') + ' first.');
+    lastKey = ''; G.render(); return r;
+  };
+  G.quietStop = false;
+  sim.on(function (e) {
+    G.bus.emit('log', e);
+    if (['finish', 'end', 'exit'].indexOf(e.kind) >= 0 && !G.quietStop) {
+      var rec = SCORE.makeRecord(sim, { at: Date.now(), scenario: G.scenarioId, preset: G.presetId });
+      if (rec.total > 0) { G.history.push(rec); if (G.history.length > SCORE.MAX_HISTORY) G.history.shift(); G.persist(); G.bus.emit('history', rec); }
+    }
+    if (['finish', 'end', 'exit'].indexOf(e.kind) >= 0) { sched = null; clearBanners(); }
+  });
+
+  function scanPulse() { if (FX.startSweep()) snd.play('scan'); }
+  setInterval(function () {
+    if (S.phase !== 'running') return;
+    var speed = parseInt($('speed').value, 10) || 1;
+    sim.tick(speed);
+    if (S.phase === 'running' && S.scanIn === FL.SCAN_EVERY) scanPulse();
+    if (S.phase === 'running' && sched && !sim.paused) sched.due(S.total - S.remaining).forEach(dispatch);
+    G.afterTick(); G.render();
+  }, 1000);
+
+  /* ---------- distractions that arrive on their own ---------- */
+  var bannerHost = $('banners'), toastHost = $('toasts');
+  function clearBanners() { bannerHost.textContent = ''; }
+  G.toast = function (text) {
+    var t = el('div', { class: 'toast', role: 'status', text: text }); toastHost.appendChild(t); later(function () { t.remove(); }, 4200);
+    while (toastHost.children.length > 2) toastHost.firstChild.remove();
+  };
+  function elapsed() { return S.total - S.remaining; }
+  function dispatch(ev) {
+    if (ev.kind === 'tab') { G.newTab(ev.url, false); G.openApp; banner(ev, 'tab'); }
+    else if (ev.kind === 'launch') {
+      if (ev.proc === 'claude-cli') { if (!G.extraProcs.some(function (p) { return p.tty === 'bg'; })) G.extraProcs.push({ pid: 4301, name: 'claude', app: null, cmd: 'claude', tty: 'bg' }); }
+      else G.openApp(ev.proc, { quiet: true });
+      banner(ev, 'launch');
+    } else banner(ev, 'banner');
+    G.render();
+  }
+  G.dispatch = dispatch;
+  function banner(ev, kind) {
+    var b = el('div', { class: 'banner', role: 'group', 'aria-label': 'Notification: ' + ev.text, draggable: kind === 'banner' ? 'true' : false });
+    b.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/plain', ev.text); e.dataTransfer.effectAllowed = 'copy'; });
+    var actions = el('div', { class: 'bacts' });
+    function done(kindNote, text, why) { if (S.phase === 'running') sim.note(kindNote, text, why); b.remove(); G.render(); }
+    function btn(label, fn, cls) { actions.appendChild(el('button', { class: 'btn small ' + (cls || ''), type: 'button', text: label, on: { click: fn } })); }
+    if (kind === 'banner') {
+      G.pushMessage(ev.from || 'Messages', ev.text);
+      btn('Let it pass', function () { done('resist', 'You let a nudge pass: "' + ev.text + '"', 'Nothing needed doing. The clock kept going.'); G.toast('Let that one go by. Nicely done.'); snd.play('pass'); }, 'primary');
+      if (sched && (ev.snoozed || 0) < 3) btn('Snooze 5 min', function () { sched.snooze(ev, elapsed(), 300); done('snooze', 'Snoozed a nudge for 5 minutes.', 'It will come back later, up to three times.'); snd.play('click'); });
+      btn('Open it', function () { done('open', 'You opened the nudge.', 'It led to ' + (ev.open && ev.open.url ? G.hostOf(ev.open.url) : 'somewhere') + '. The watchdog checks the front tab within ' + FL.BROWSER_POLL + ' seconds.'); if (ev.open && ev.open.url) G.navigate(ev.open.url); });
+      btn('Park in Notes', function () { G.dropOnNotes(ev.text); b.remove(); G.render(); });
+    } else if (kind === 'tab') {
+      btn('Let it be', function () { done('resist', 'You left a tempting tab alone.', 'Only the front tab is read, so a background tab does nothing until you switch to it.'); G.toast('Left alone. Fine.'); }, 'primary');
+      btn('Close it', function () { var t = G.browser.tabs.filter(function (x) { return x.url === ev.url; })[0]; if (t) G.closeTab(t.id); done('resist', 'You closed a tempting tab.', ''); });
+      btn('Look at it', function () { var t = G.browser.tabs.filter(function (x) { return x.url === ev.url; })[0]; if (t) G.browser.active = t.id; G.openApp('browser'); G.updateBrowser(); done('open', 'You switched to the tempting tab.', 'Now it is the front tab, so the next check will redirect it.'); });
+    } else {
+      btn('Quit it', function () { if (ev.proc === 'claude-cli') G.extraProcs = G.extraProcs.filter(function (p) { return p.tty !== 'bg'; }); else G.closeApp(ev.proc); done('resist', 'You quit the program that opened itself.', 'The next scan sees a clean machine and the clock resumes.'); }, 'primary');
+      btn('Keep it open', function () { b.remove(); });
+    }
+    b.insertBefore(el('div', { class: 'btext' }, [el('strong', { text: kind === 'banner' ? (ev.from || 'Messages') : 'Heads up' }), el('span', { text: ev.text })]), b.firstChild);
+    b.appendChild(actions); bannerHost.appendChild(b); snd.play('notify');
+    while (bannerHost.children.length > 3) bannerHost.firstChild.remove();
+    announce('Notification: ' + ev.text);
+  }
+  G.bus.on('parked', function (text) { if (S.phase === 'running') sim.note('park', 'You parked a nudge in Notes for later.', 'Written down is safely out of your head.'); G.toast('Parked in Notes. It will keep.'); });
+
+  /* ---------- the overlay ---------- */
+  var slot = $('overlay-slot');
   function overlayView() {
-    var o = S.overlay, slot = $('overlay-slot');
-    var key = o ? o.kind + (o.processes ? o.processes.join() : '') + (o.site || '') : '';
+    var o = S.overlay, key = o ? o.kind + (o.processes ? o.processes.join() : '') + (o.site || '') : '';
     if (slot.getAttribute('data-key') === key) return;
-    slot.setAttribute('data-key', key);
-    var old = slot.firstElementChild;
+    slot.setAttribute('data-key', key); var old = slot.firstElementChild;
     if (!o) {
-      /* The overlay lifts away instead of vanishing; it never blocks the controls underneath while it goes. */
-      if (old && FX.on() && !old.classList.contains('out')) { old.classList.add('out'); later(function () { if (old.parentNode && old.classList.contains('out')) old.remove(); }, 520); }
-      else slot.textContent = '';
+      if (old && FX.on() && !old.classList.contains('out')) { old.classList.add('out'); later(function () { if (old.parentNode && old.classList.contains('out')) old.remove(); }, 520); } else slot.textContent = '';
       return;
     }
     slot.textContent = '';
-    var sosBtn = el('button', { class: 'btn warn small sos', type: 'button', id: 'sos', text: 'Emergency exit: end session now', on: { click: function () {
-      ripple(sosBtn); sim.emergencyExit('SOS button'); snd.play('exit'); snd.play('ripple'); render(); } } });
-    var foot = el('div', { class: 'foot' }, [sosBtn,
-      el('div', { style: 'margin-top:.5rem', text: 'also: Ctrl+Shift+Esc here (⌘⇧Esc on a Mac) · or run  focuslock unlock  in a terminal' })]);
+    var sos = el('button', { class: 'btn warn small sos', type: 'button', id: 'sos', text: 'Emergency exit: end session now', on: { click: function () { ripple(sos); sim.emergencyExit('SOS button'); snd.play('exit'); snd.play('ripple'); G.render(); } } });
+    var foot = el('div', { class: 'foot' }, [sos, el('div', { class: 'footnote', text: 'also: Ctrl+Shift+Esc here (⌘⇧Esc on a Mac) · or run  focuslock unlock  in a terminal' })]);
     var inner;
-    if (o.kind === 'llm') {
-      inner = [el('h3', { text: 'No LLM shortcuts.' }), el('p', { class: 'procs', text: 'Running: ' + o.processes.join(', ') }),
-        el('p', { text: 'The struggle is the workout: outsourcing it skips the rep. Your timer is paused until they are closed. It resumes automatically.' }),
-        el('button', { class: 'btn primary', type: 'button', text: 'Give me 30 seconds to close it', on: { click: function () { sim.grantGrace(); render(); } } }), foot];
-    } else if (o.kind === 'unreadable') {
-      inner = [el('h3', { text: "Can't see the browser tab" }),
-        el('p', { text: 'Allow FocusLock to control the browser in System Settings, Privacy and Security, Automation. Until then the browser stays locked.' }), foot];
-    } else {
-      inner = [el('h3', { text: o.category === 'LLM' ? 'No LLM shortcuts' : o.site + ' can wait' }),
-        el('p', { text: 'Search, docs, YouTube and music are all fine during focus; ' + o.site + " isn't. Redirected you out of there." }), foot];
-    }
+    if (o.kind === 'llm') inner = [el('h3', { text: 'No LLM shortcuts.' }), el('p', { class: 'procs', text: 'Running: ' + o.processes.join(', ') }),
+      el('p', { text: 'The struggle is the workout: outsourcing it skips the rep. Your timer is paused until they are closed. It resumes automatically.' }),
+      el('button', { class: 'btn primary', type: 'button', id: 'grace', text: 'Give me ' + sim.rules.grace + ' seconds to close it', on: { click: function () { sim.grantGrace(); G.render(); } } }), foot];
+    else if (o.kind === 'unreadable') inner = [el('h3', { text: "Can't see the browser tab" }), el('p', { text: 'Allow FocusLock to control the browser in System Settings, Privacy and Security, Automation. Until then the browser stays locked.' }), foot];
+    else inner = [el('h3', { text: o.category === 'LLM' ? 'No LLM shortcuts' : o.site + ' can wait' }), el('p', { text: 'Search, docs, YouTube and music are all fine during focus; ' + o.site + " isn't. Redirected you out of there." }), foot];
     slot.appendChild(el('div', { class: 'overlay ' + (o.kind === 'llm' ? 'llm' : 'browser'), role: 'alertdialog', 'aria-label': 'FocusLock overlay' }, [el('div', {}, inner)]));
     if (o.kind === 'llm') snd.play('whoosh');
   }
-
-  /* A ring that spreads from the SOS button, then fades. Decorative; the exit has already happened. */
   function ripple(btn) {
-    if (!FX.on()) return;
-    var sr = $('stage').getBoundingClientRect(), br = btn.getBoundingClientRect();
+    if (!FX.on()) return; var sr = $('desktop').getBoundingClientRect(), br = btn.getBoundingClientRect();
     var r = el('div', { class: 'ripple', 'aria-hidden': 'true', style: 'left:' + (br.left + br.width / 2 - sr.left) + 'px;top:' + (br.top + br.height / 2 - sr.top) + 'px' });
-    $('stage').appendChild(r); later(function () { r.remove(); }, 900);
+    $('desktop').appendChild(r); later(function () { r.remove(); }, 900);
   }
 
-  var lastLogCount = -1, lastPaused = false, lastPhase = '', lastWinKey = '', lastViolations = 0;
-  function render() {
-    var phase = S.phase, kids, key;
-    if (phase !== 'running') sheet = false;
-    key = phase + '|' + (phase === 'running' ? sim.paused + '|' + S.violations + '|' + sheet + (sheet ? Math.ceil(S.remaining / 60) : '') : minutes + S.blockers.join());
-    if (phase === 'running') updateDial();
-    if (key !== lastWinKey) {
-      kids = phase === 'running' ? sessionView() : phase === 'finished' ? finishedView() : setupView();
-      var focusedId = document.activeElement && win.contains(document.activeElement) ? document.activeElement.id : '';
-      win.textContent = ''; win.appendChild(chrome());
-      var body = el('div', { class: 'body' }, kids); win.appendChild(body);
-      if (focusedId && $(focusedId)) $(focusedId).focus();
-      lastWinKey = key; lastViolations = S.violations;
-    }
+  var lastPaused = false, lastPhase = '';
+  function stateEffects() {
     overlayView();
-    if (S.phase === 'running' && S.tab !== 'about:blank') $('page-view').textContent = 'Tab: ' + S.tab;
-    else if (S.phase === 'running') $('page-view').textContent = 'Tab: about:blank' + (S.violations ? '  (redirected here)' : '');
-    renderLog();
-    markRows();
-    if (lastPhase === 'running' && phase === 'finished') { snd.play('finish'); announce('Session complete.'); }
-    if (phase === 'running') {
-      if (sim.paused && !lastPaused) {
-        snd.play('pause'); announce('Timer paused: ' + S.detected.join(', ') + ' detected.');
-        if (FX.on()) { restart(dialNode, 'settle'); FX.distract(); if ($('shake').checked) restart($('stage'), 'shake'); }
-      }
-      if (!sim.paused && lastPaused) { snd.play('resume'); snd.play('lift'); announce('Timer resumed.'); if (FX.on()) restart(dialNode, 'rise-back'); }
+    var si = $('status-item');
+    if (si) { si.textContent = S.phase === 'running' ? (sim.paused ? 'Paused ' : 'Locked ') + FL.formatTime(S.remaining) : 'FocusLock'; si.classList.toggle('paused', sim.paused); }
+    if (lastPhase === 'running' && S.phase === 'finished') { snd.play('finish'); announce('Session complete.'); G.toast('Session complete. Well done for sitting down to it.'); }
+    if (S.phase === 'running') {
+      if (sim.paused && !lastPaused) { snd.play('pause'); announce('Timer paused: ' + S.detected.join(', ') + ' detected.'); if (FX.on()) { restart(dialNode, 'settle'); FX.distract(); if (G.prefs.shake) restart($('desktop'), 'shake'); } }
+      if (!sim.paused && lastPaused) { snd.play('resume'); snd.play('lift'); announce('Timer resumed.'); G.toast('Back on the clock. Coming back is the skill.'); if (FX.on()) restart(dialNode, 'rise-back'); }
     }
-    if (phase === 'idle' && lastPhase === 'running') FX.resetDial();
-    lastPaused = phase === 'running' && sim.paused; lastPhase = phase;
+    if (S.phase === 'idle' && lastPhase === 'running') FX.resetDial();
+    lastPaused = S.phase === 'running' && sim.paused; lastPhase = S.phase;
     FX.refresh();
   }
-  /* Programs the watchdog has found stay tinted until they are closed. */
-  function markRows() {
-    var rows = apps.querySelectorAll('.approw');
-    FL.LLM_PROGRAMS.forEach(function (name, i) { rows[i].classList.toggle('hit', S.phase === 'running' && S.detected.indexOf(name) >= 0); });
-  }
-  function renderLog() {
-    if (S.log.length === lastLogCount) return;
-    lastLogCount = S.log.length;
-    var ol = $('log'); ol.textContent = '';
-    if (!S.log.length) { ol.appendChild(el('li', { class: 'empty', text: 'Nothing yet. Start a session.' })); return; }
-    S.log.slice().reverse().forEach(function (l) {
-      var kids = [el('span', { class: 'tag ' + l.kind, text: l.kind }), l.text];
-      if (l.why) kids.push(el('span', { class: 'why', text: 'Why: ' + l.why }));
-      ol.appendChild(el('li', {}, kids));
-    });
-  }
+  G.renderers.push(stateEffects);
+  var lastBlocks = 0;
+  G.bus.on('log', function (e) { if (e.kind === 'block') { snd.play('block'); FX.distract(); } });
 
-  setInterval(function () {
-    if (S.phase !== 'running') return;
-    sim.tick(parseInt($('speed').value, 10) || 1);
-    if (S.phase === 'running' && S.scanIn === FL.SCAN_EVERY) scanPulse();
-    render();
-  }, 1000);
-  function scanPulse() { if (FX.startSweep()) snd.play('scan'); }
-  /* When the tab is hidden the timers throttle; that only slows the demo. */
+  /* status item popover (a page extra) */
+  G.statusPopover = function (btn) {
+    var r = btn.getBoundingClientRect(), d = $('desktop').getBoundingClientRect();
+    G.openMenu({ x: r.right - d.left - 220, y: r.bottom - d.top + 2 }, [
+      { label: S.phase === 'running' ? (sim.paused ? 'Paused, ' : 'Locked in, ') + FL.formatTime(S.remaining) + ' left' : 'Not in a session', disabled: true, action: function () {} },
+      { label: 'Open the FocusLock window', action: function () { G.openApp('focuslock'); } },
+      { sep: true }, { label: 'Page extra: the real app is a window, with no menu bar item', disabled: true, action: function () {} }], 'FocusLock status (page extra)', btn);
+  };
 
-  /* ---- filter probe ---- */
+  /* ---------- toolbar: presets, scenarios, link, tour, keys ---------- */
+  var presetSel = $('preset'), scenSel = $('scenario');
+  SC.PRESETS.forEach(function (p) { presetSel.appendChild(el('option', { value: p.id, text: p.name + ' (' + p.mins + ' min)' })); });
+  presetSel.insertBefore(el('option', { value: '', text: 'Custom' }), presetSel.firstChild);
+  SC.SCENARIOS.forEach(function (s) { scenSel.appendChild(el('option', { value: s.id, text: s.name })); });
+  function syncToolbar() { presetSel.value = G.presetId; scenSel.value = G.scenarioId; $('scn-blurb').textContent = SC.scenario(G.scenarioId).blurb; $('dist').checked = G.prefs.distractions; $('shk').checked = G.prefs.shake; }
+  presetSel.addEventListener('change', function () { var p = SC.preset(presetSel.value); G.presetId = presetSel.value; if (p) { G.scenarioId = p.scenario; G.setRules(R.setMins(G.rules, p.mins)); } G.updateHash(); syncToolbar(); G.render(); });
+  scenSel.addEventListener('change', function () { G.scenarioId = scenSel.value; G.updateHash(); syncToolbar(); });
+  $('dist').addEventListener('change', function () { G.prefs.distractions = this.checked; G.savePrefs(); if (!this.checked) { sched = null; } });
+  $('shk').addEventListener('change', function () { G.prefs.shake = this.checked; G.savePrefs(); });
+  G.nextPreset = function () { var ids = [''].concat(SC.PRESETS.map(function (p) { return p.id; })), i = ids.indexOf(G.presetId); presetSel.value = ids[(i + 1) % ids.length]; presetSel.dispatchEvent(new Event('change')); };
+  G.nextScenario = function () { var i = SC.SCENARIOS.map(function (s) { return s.id; }).indexOf(G.scenarioId); scenSel.value = SC.SCENARIOS[(i + 1) % SC.SCENARIOS.length].id; scenSel.dispatchEvent(new Event('change')); };
+  G.copyLink = function () {
+    G.updateHash(); var url = location.href.split('#')[0] + '#' + G.shareHash();
+    var ok = false; try { if (navigator.clipboard) { navigator.clipboard.writeText(url); ok = true; } } catch (e) {}
+    $('share-out').value = url; G.toast(ok ? 'Link copied. It reopens your rules and scenario.' : 'Link is in the box below the toolbar: copy it from there.'); snd.play('click'); $('share-out').hidden = false; if (!ok) $('share-out').select();
+  };
+  $('share').addEventListener('click', G.copyLink);
+  $('tour-btn').addEventListener('click', function () { G.bus.emit('tour'); });
+  $('keys-btn').addEventListener('click', function () { G.bus.emit('help'); });
+  G.bus.on('rules', function () { syncToolbar(); renderFilterLists(); probe(false); });
+
+  /* ---------- keyboard ---------- */
+  document.addEventListener('keydown', function (e) {
+    var act = K.matchKey(e); if (!act) return;
+    if (act === 'exit') { if (S.overlay) { e.preventDefault(); if (sim.emergencyExit('keyboard shortcut')) { snd.play('exit'); G.render(); } } return; }
+    e.preventDefault();
+    var m = /^(open|tab):(.+)$/.exec(act);
+    if (m && m[1] === 'open') G.openApp(m[2]); else if (m && m[1] === 'tab') G.bus.emit('tab', m[2]);
+    else if (act === 'help') G.bus.emit('help'); else if (act === 'tour') G.bus.emit('tour');
+    else if (act === 'lock') { if (!G.isOpen('focuslock')) G.openApp('focuslock'); else if (S.phase === 'idle' || S.phase === 'finished') { if (S.phase === 'finished') sim.reset(); G.lockIn(); } else G.openApp('focuslock'); }
+    else if (act === 'next') G.cycle(1); else if (act === 'prev') G.cycle(-1);
+    else if (act === 'minimize') { var f = G.wm.front(); if (f) G.minimizeApp(f.id); } else if (act === 'close') { var f2 = G.wm.front(); if (f2) G.closeApp(f2.id); }
+    else if (act === 'preset') G.nextPreset(); else if (act === 'scenario') G.nextScenario();
+    else if (act === 'undo') { if (!G.undo()) G.toast('Nothing to undo.'); else announce('Undid the last rules edit.'); } else if (act === 'redo') { if (!G.redo()) G.toast('Nothing to redo.'); }
+    else if (act === 'share') G.copyLink();
+    else if (act === 'motion') { calm.checked = !calm.checked; calm.dispatchEvent(new Event('change')); announce(calm.checked ? 'All motion stopped.' : 'Motion allowed.'); }
+    else if (act === 'sound') { sound.checked = !sound.checked; sound.dispatchEvent(new Event('change')); announce(sound.checked ? 'Sound on.' : 'Sound off.'); }
+  });
+  /* magnetic buttons: a tiny pull toward the pointer (only when motion is allowed) */
+  document.addEventListener('pointermove', function (e) {
+    var t = e.target.closest && e.target.closest('[data-magnet]'); if (!t || !FX.on()) return;
+    var r = t.getBoundingClientRect(), dx = (e.clientX - (r.left + r.width / 2)) / r.width, dy = (e.clientY - (r.top + r.height / 2)) / r.height;
+    t.style.transform = 'translate(' + (dx * 6).toFixed(1) + 'px,' + (dy * 4).toFixed(1) + 'px)';
+  });
+  document.addEventListener('pointerout', function (e) { var t = e.target.closest && e.target.closest('[data-magnet]'); if (t) t.style.transform = ''; });
+
+  /* ---------- the filter probe (follows your current rules) ---------- */
   var PROBES = ['https://old.reddit.com/r/adhd', 'https://notreddit.com', 'https://www.youtube.com/watch?v=lofi', 'https://chat.openai.com', 'about:blank', 'file:///notes/todo.html', 'https://docs.swift.org'];
   PROBES.forEach(function (u) { $('probe-chips').appendChild(el('button', { type: 'button', class: 'chip', text: u.replace(/^https:\/\//, ''), on: { click: function () { $('probe').value = u; probe(true); } } })); });
   function probe(fromUser) {
-    var u = normalize($('probe').value), v = FL.verdictForUrl(u), box = $('verdict');
+    var u = G.normalizeAddr($('probe').value), v = FL.verdictForUrl(u, G.rules.blocklist), box = $('verdict');
     box.className = 'verdict ' + v.kind; box.textContent = '';
-    box.appendChild(el('strong', { text: v.kind === 'blocked' ? 'Redirected: ' + v.site + ' (' + v.category + ')' : 'Allowed' }));
-    box.appendChild(el('div', { text: v.reason }));
+    box.appendChild(el('strong', { text: v.kind === 'blocked' ? 'Redirected: ' + v.site + ' (' + v.category + ')' : 'Allowed' })); box.appendChild(el('div', { text: v.reason }));
     if (fromUser) { restart(box, 'stamp'); snd.play('stamp'); }
   }
   $('probe-form').addEventListener('submit', function (e) { e.preventDefault(); probe(true); });
-  FL.BLOCKLIST.forEach(function (r) {
-    $(r.category === 'LLM' ? 'list-llm' : 'list-social').appendChild(el('li', { text: r.domain }));
-  });
-  probe(); render();
-  FX.init({
-    stage: $('stage'), canvas: $('fx-canvas'), simEl: $('sim'), state: S, sweepEl: sweepEl, sweepHost: apps,
-    paused: function () { return sim.paused; },
-    rows: function () { return Array.prototype.slice.call(apps.querySelectorAll('.approw')); },
-    dial: function () { return { prog: dialProg, glow: dialGlow, circ: C }; }
-  });
-  /* Scroll feel: a thin progress line, and gentle reveals that never hide anything for long. */
-  var sbar = $('scrollbar'), pend = false;
-  function onScroll() {
-    if (pend) return; pend = true;
-    requestAnimationFrame(function () {
-      pend = false; var max = root.scrollHeight - innerHeight;
-      sbar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, scrollY / max) : 0).toFixed(4) + ')';
-    });
+  function renderFilterLists() {
+    ['list-social', 'list-llm', 'list-other'].forEach(function (id) { $(id).textContent = ''; });
+    G.rules.blocklist.forEach(function (r) { $(r.category === 'LLM' ? 'list-llm' : r.category === 'social media' ? 'list-social' : 'list-other').appendChild(el('li', { text: r.domain })); });
+    $('card-other').hidden = !$('list-other').children.length;
   }
+
+  /* ---------- scroll feel, reveals ---------- */
+  var sbar = $('scrollbar'), pend = false;
+  function onScroll() { if (pend) return; pend = true; requestAnimationFrame(function () { pend = false; var max = root.scrollHeight - innerHeight; sbar.style.transform = 'scaleX(' + (max > 0 ? Math.min(1, scrollY / max) : 0).toFixed(4) + ')'; }); }
   addEventListener('scroll', onScroll, { passive: true }); onScroll();
-  var revealEls = Array.prototype.slice.call(document.querySelectorAll('.card, .panel, .steps li, .priv, .verdict'));
+  var revealEls = Array.prototype.slice.call(document.querySelectorAll('.card, .steps li, .priv'));
   revealEls.forEach(function (n, i) { n.classList.add('reveal'); n.style.setProperty('--d', ((i % 3) * 0.07).toFixed(2) + 's'); });
   function showAll() { revealEls.forEach(function (n) { n.classList.add('in'); }); }
   if ('IntersectionObserver' in window) {
     var rio = new IntersectionObserver(function (es) { es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); rio.unobserve(e.target); } }); }, { threshold: 0.08 });
-    revealEls.forEach(function (n) { rio.observe(n); });
-    later(showAll, 3000);
+    revealEls.forEach(function (n) { rio.observe(n); }); later(showAll, 3000);
+    var hero = document.querySelector('.breath'); if (hero) new IntersectionObserver(function (es) { hero.classList.toggle('off', !es[0].isIntersecting); }).observe(hero);
   } else showAll();
-  /* Looping decoration (the hero halo) rests while it is off screen. */
-  if ('IntersectionObserver' in window) {
-    var hero = document.querySelector('.breath');
-    new IntersectionObserver(function (es) { hero.classList.toggle('off', !es[0].isIntersecting); }).observe(hero);
-  }
 
+  /* ---------- start ---------- */
+  var th = $('tour-hero'); if (th) th.addEventListener('click', function () { G.bus.emit('tour'); });
+  FX.init({
+    stage: $('desktop'), canvas: $('fx-canvas'), simEl: $('try'), state: S, sweepEl: G.xray.sweepEl, sweepHost: G.xray.host,
+    paused: function () { return sim.paused; }, rows: G.xray.rows,
+    dial: function () { return { prog: dialProg, glow: dialGlow, circ: C }; }
+  });
+  renderFilterLists(); probe(false); syncToolbar();
+  G.openApp('focuslock', { quiet: true, keepFocus: true });
+  G.render();
+  window.addEventListener('load', function () { G.bus.emit('ready'); });
+  G.bus.emit('ready');
 })();
