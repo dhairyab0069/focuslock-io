@@ -496,3 +496,20 @@ html.fx .pausering { animation: pausebreathe 10s ease-in-out infinite; } @keyfra
 .ground-hl { outline: 4px solid var(--lav); outline-offset: 8px; border-radius: 14px; }
 @media (max-width: 700px) { .breathe { left: 8px; bottom: 8px; } .br-label { display: none; } .stone { transform: scale(.8); } }
 @media (prefers-reduced-motion: reduce) { .fog { display: none; } }
+
+/* ---------- symbol switches in the top bar ---------- */
+.switches.icons { gap: .4rem; flex-wrap: nowrap; }
+.ico { display: inline-grid; place-items: center; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--muted, currentColor); cursor: pointer;
+  transition: transform .18s cubic-bezier(.2,.7,.2,1), background-color .2s, color .2s, box-shadow .2s, border-color .2s; }
+.ico .i { width: 24px; height: 24px; }
+.ico:hover { transform: translateY(-1px); border-color: var(--sage); }
+.ico:active { transform: scale(.94); }
+.ico:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.ico[aria-pressed="true"] { color: var(--ink, currentColor); background: color-mix(in srgb, var(--sage) 26%, transparent); border-color: var(--sage); box-shadow: 0 0 14px color-mix(in srgb, var(--sage) 40%, transparent); }
+.ico[aria-pressed="false"] { opacity: .72; }
+.ico .off-only { display: none; }
+.ico[aria-pressed="false"] .on-only { display: none; }
+.ico[aria-pressed="false"] .off-only { display: inline; }
+#quiet-all[aria-pressed="true"] { color: var(--ink, currentColor); }
+#quiet-all .off-only, #quiet-all .on-only { display: inline; }
+@media (max-width: 640px) { .ico { width: 40px; height: 40px; } .switches.icons { gap: .25rem; } }

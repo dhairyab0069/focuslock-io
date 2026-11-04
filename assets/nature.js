@@ -10,7 +10,7 @@
 
   /* ---------- Calm mode: one switch fades every cursor effect ---------- */
   var calmSw = $('sw-cursor');
-  var stored = UI.load('fl-cursor');
+  var stored = UI.load('fl2-cursor');
   var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   var calmCursor = stored === null ? reduced : stored === 'off';
   function applyCalm() {
@@ -18,8 +18,7 @@
     if (calmCursor) { clearVars(); fog.classList.remove('on'); }
   }
   var fog = $('fog');
-  calmSw.addEventListener('change', function () { calmCursor = calmSw.checked; UI.save('fl-cursor', calmCursor ? 'off' : 'on'); applyCalm(); FX.ensure(); announce(calmCursor ? 'Calm mode on. Cursor effects faded out.' : 'Cursor effects on.'); });
-  $('quiet-all').addEventListener('click', function () { calmCursor = true; UI.save('fl-cursor', 'off'); applyCalm(); });
+  calmSw.addEventListener('change', function () { calmCursor = calmSw.checked; UI.save('fl2-cursor', calmCursor ? 'off' : 'on'); applyCalm(); FX.ensure(); announce(calmCursor ? 'Calm mode on. Cursor effects faded out.' : 'Cursor effects on.'); });
   function cursorOn() { return FX.on() && !calmCursor; }
 
   /* ---------- pointer (a finger counts) ---------- */

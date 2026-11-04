@@ -1,4 +1,4 @@
-/* Optional sound: tiny tones made live with the Web Audio API. Off by default, no audio files. */
+/* Sound: tiny tones made live with the Web Audio API, no audio files. On by default; browsers only allow audio after the first touch or key press, so the context resumes then. */
 (function (root) {
   'use strict';
   var ctx = null, on = false;
@@ -55,6 +55,9 @@
     exit:   function () { tone(440, 0, 0.3, 0.05); tone(330, 0.12, 0.5, 0.05); },
     finish: function () { tone(392, 0, 0.7, 0.05); tone(493.88, 0.15, 0.7, 0.05); tone(587.33, 0.3, 1.0, 0.05); }
   };
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (n) {
+    root.addEventListener(n, function () { if (on) { var c = ensure(); if (c && c.state === 'suspended') c.resume(); } }, { passive: true });
+  });
   root.FLSound = {
     get on() { return on; },
     set: function (v) {

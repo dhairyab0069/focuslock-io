@@ -46,11 +46,11 @@ The page is re-skinned in mist, sage, warm sand, deep-water teal and a touch of 
 - *Breathing guide:* a ring in the corner (or following the pointer). Hold it, or hold Space or Enter on it, to breathe at a calm pace (in 4 out 6, in 4 out 4, or box). It can pace the simulator's glow, can be hidden, and becomes words only when motion is off.
 - *Mindful moments:* an optional 20 second pause and a five-things grounding exercise. Page extras, not medical advice.
 
-**Calm mode** (top bar) fades every cursor effect at once. **Stop all motion**, **Quiet everything** and `prefers-reduced-motion` also stop the background loop (it becomes a still picture), the lantern, haze, lean and parallax. Everything joins the page's single animation loop in `assets/fx.js`, uses only canvas, transform and opacity, pauses when the tab is hidden, and is `aria-hidden` decoration.
+The three symbols in the top bar (speaker, wave, lantern) switch sound, motion and cursor effects, all on by default, and the moon quiets all three at once (press again to bring them back). Turning the lantern off fades every cursor effect at once. The motion symbol, the moon and `prefers-reduced-motion` also stop the background loop (it becomes a still picture), the lantern, haze, lean and parallax. Everything joins the page's single animation loop in `assets/fx.js`, uses only canvas, transform and opacity, pauses when the tab is hidden, and is `aria-hidden` decoration.
 
 ## Quiet by design
 
-- The top bar has **Stop all motion** (starts on if your system asks for reduced motion) and **Sound**
+- The top bar has symbol switches for sound, motion and cursor effects (motion starts off only if your system asks for reduced motion; sound starts on and begins playing after the first touch or key press, as browsers require)
   (always off until you switch it on), plus a **Quiet everything** button. Choices are kept in `localStorage`
   on this device only.
 - Sound is synthesized live with the Web Audio API (`assets/sound.js`); there are no audio files.
@@ -66,7 +66,7 @@ Motion is there to show cause and effect, and every piece of it stops when you a
 - *Pause and resume:* the overlay closes like an iris over the pretend Mac and lifts away again. An optional gentle shake (off by default) is in the simulator panel.
 - *Redirect:* chosen addresses type themselves out; the tab slides to the blank page; the counter bumps.
 - *Probe verdicts* settle in with a stamp, the SOS button pulses slowly and sends a ripple when pressed, cards and sections ease in on scroll, a thin line shows scroll progress, and every control has hover and press feedback.
-- *Sound:* each of these has a matching quiet synthesized sound (scan blip, whoosh, stamp, ripple, type tick), still off by default.
+- *Sound:* each of these has a matching quiet synthesized sound (scan blip, whoosh, stamp, ripple, type tick), on by default (switch it off with the speaker symbol).
 
 Rules the code keeps (checked in `tests/run.js`): nothing repeats faster than every 2 seconds; only transform, opacity and clip-path animate; one `requestAnimationFrame` loop (`assets/fx.js`) that stops when the tab is hidden, the simulator is off screen or nothing is moving; at most 48 motes; nothing waits on an animation (state changes happen first, the motion follows). **Stop all motion**, **Quiet everything** and the system's reduced-motion setting all stop every loop, mote, shake and reveal and leave a clear still page (the `html.fx` class is the single gate).
 

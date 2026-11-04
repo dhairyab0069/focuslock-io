@@ -6,11 +6,43 @@
   var sim = G.sim, S = sim.state, root = document.documentElement, sched = null, sheet = false, lastViolations = 0;
 
   /* ---------- quiet settings ---------- */
-  var calm = $('sw-calm'), sound = $('sw-sound');
+  /* Three symbols, one source of truth each. Hidden checkboxes hold the state the rest of the code reads:
+     sw-calm checked = motion stopped, sw-sound checked = sound on, sw-cursor checked = cursor effects faded. */
+  var calm = $('sw-calm'), sound = $('sw-sound'), cursor = $('sw-cursor');
+  var bSound = $('b-sound'), bMotion = $('b-motion'), bCursor = $('b-cursor'), bQuiet = $('quiet-all');
+  var reducedSys = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   calm.checked = root.getAttribute('data-calm') === 'on';
-  calm.addEventListener('change', function () { root.setAttribute('data-calm', calm.checked ? 'on' : 'off'); UI.save('fl-calm', calm.checked ? 'on' : 'off'); });
-  sound.addEventListener('change', function () { snd.set(sound.checked); snd.play('click'); });
-  $('quiet-all').addEventListener('click', function () { calm.checked = true; calm.dispatchEvent(new Event('change')); sound.checked = false; snd.set(false); announce('Motion and sound are off.'); });
+  sound.checked = UI.load('fl2-sound') !== 'off';           /* sound starts on; the browser lets it play after the first touch or key */
+  snd.set(sound.checked);
+  function setBtn(btn, on, name, extra) {
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', name + (on ? ' on' : ' off'));
+    btn.title = name + (on ? ' on. Press to turn off.' : ' off. Press to turn on.') + (extra || '');
+  }
+  function sync() {
+    setBtn(bSound, sound.checked, 'Sound');
+    setBtn(bMotion, !calm.checked && !reducedSys, 'Motion', reducedSys ? ' (Your system asks for reduced motion, so motion stays still.)' : '');
+    setBtn(bCursor, !cursor.checked, 'Cursor effects');
+    bQuiet.setAttribute('aria-pressed', String(quiet.on));
+  }
+  var quiet = { on: false, prev: null };
+  calm.addEventListener('change', function () { root.setAttribute('data-calm', calm.checked ? 'on' : 'off'); UI.save('fl2-calm', calm.checked ? 'on' : 'off'); sync(); });
+  sound.addEventListener('change', function () { snd.set(sound.checked); UI.save('fl2-sound', sound.checked ? 'on' : 'off'); if (sound.checked) snd.play('click'); sync(); });
+  cursor.addEventListener('change', sync);
+  function flip(box) { box.checked = !box.checked; box.dispatchEvent(new Event('change')); }
+  bSound.addEventListener('click', function () { flip(sound); });
+  bMotion.addEventListener('click', function () { flip(calm); announce(calm.checked ? 'Motion off.' : 'Motion on.'); });
+  bCursor.addEventListener('click', function () { flip(cursor); });
+  function setAll(soundOn, motionOn, cursorOn) {
+    [[sound, soundOn], [calm, !motionOn], [cursor, !cursorOn]].forEach(function (p) { if (p[0].checked !== p[1]) { p[0].checked = p[1]; p[0].dispatchEvent(new Event('change')); } });
+  }
+  bQuiet.addEventListener('click', function () {
+    if (!quiet.on) { quiet.prev = [sound.checked, !calm.checked, !cursor.checked]; setAll(false, false, false); quiet.on = true; announce('Everything is quiet: sound, motion and cursor effects are off.'); }
+    else { var p = quiet.prev || [true, true, true]; setAll(p[0], p[1], p[2]); quiet.on = false; announce('Sound, motion and cursor effects are back.'); }
+    sync();
+  });
+  new MutationObserver(sync).observe(root, { attributes: true, attributeFilter: ['data-calm', 'data-cursor'] });
+  sync();
 
   /* ---------- the FocusLock window ---------- */
   var C = 2 * Math.PI * 80, NS = 'http://www.w3.org/2000/svg';
